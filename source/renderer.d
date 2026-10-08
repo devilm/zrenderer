@@ -153,7 +153,7 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
 
     foreach (sprite; sprites)
     {
-        uint actionindex = (sprite.type == SpriteType.shadow) ? 0 : action;
+        uint actionindex = (sprite.type == SpriteType.shadow || sprite.type == SpriteType.effect) ? 0 : action;
         uint frameindex = (sprite.type == SpriteType.shadow) ? 0 : frame;
 
         DrawObject drawobject;
@@ -161,12 +161,20 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
         {
             drawobject = sprite.drawObjectsOfAction(actionindex);
 
-            import std.algorithm : max;
+            if (sprite.type != SpriteType.effect)
+            {
+                import std.algorithm : max;
 
-            maxframes = max(maxframes, drawobject.children.length);
+                maxframes = max(maxframes, drawobject.children.length);
+            }
         }
         else
         {
+            if (sprite.type == SpriteType.effect)
+            {
+                frameindex %= cast(uint) sprite.act.frames(actionindex).length;
+            }
+
             const playerAction = intToPlayerAction(actionindex);
             if (sprite.type == SpriteType.accessory && sprite.act.frames(actionindex).length > 3 &&
                     (playerAction == PlayerAction.stand || playerAction == PlayerAction.sit))
@@ -235,6 +243,11 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
             {
                 actionindex = 0;
                 frameindex = 0;
+            }
+            else if (sprite.type == SpriteType.effect)
+            {
+                actionindex = 0;
+                frameindex = cast(uint) (i % sprite.act.frames(0).length);
             }
             else if ((sprite.type == SpriteType.playerhead || sprite.type == SpriteType.accessory || sprite.type == SpriteType.garment) &&
                     (playerAction == PlayerAction.stand || playerAction == PlayerAction.sit))

@@ -34,7 +34,8 @@ A tool to render sprites from Ragnarok Online
                   --outfit The alternative outfit for player characters. Not all characters have alternative outfits. In these cases the default character will be rendered instead. Value of 0 means no outfit. Default: 0
                 --headgear Headgears which should be attached to the players head. Can contain up to 3 comma separated values. Default: 
                  --garment Garment which should be attached to the players body. Default: 0
-                  --weapon Weapon which should be attached to the players body. Default: 0
+                  --effect Effect folder under data/sprite/이팩트 to render behind the character. Default:
+                 --weapon Weapon which should be attached to the players body. Default: 0
                   --shield Shield which should be attached to the players body. Default: 0
 -a                --action Action of the job which should be drawn. Default: 0
 -f                 --frame Frame of the action which should be drawn. Set to -1 to draw all frames. Default: -1
@@ -63,6 +64,10 @@ A tool to render sprites from Ragnarok Online
 Options _hosts_, _port_, _logfile_ and _tokenfile_ are ignored for the CLI tool.
 ### Example
 If not otherwise specified the requested sprites will be renderered as an APNG animation of the first action (0, Stand).
+
+To render an effect from either `data/sprite/이팩트/<name>/<name>.act` and `.spr` or
+root-level `data/sprite/이팩트/<name>.act` and `.spr`, pass its name:
+`./zrenderer --job=1 --effect=c_aura_of_ghost_s`
 
 **Render monster with id 1001 (Scorpion) with action 0 (Stand, default)**  
 `./zrenderer --job=1001`  
@@ -222,4 +227,3 @@ Depending on your system the command prompt will be available for x86 and x64. W
 
 ---
 All Ragnarok Online related media and content are copyrighted © by Gravity Co., Ltd & Lee Myoungjin(studio DTDS) and have all rights reserved.
-

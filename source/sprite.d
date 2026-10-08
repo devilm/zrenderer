@@ -12,6 +12,7 @@ enum SpriteType
 {
     accessory,
     costume,
+    effect,
     garment,
     homunculus,
     mercenary,

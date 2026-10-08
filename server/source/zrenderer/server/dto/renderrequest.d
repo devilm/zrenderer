@@ -12,6 +12,7 @@ struct RenderRequestData
     @optional Nullable!uint head;
     @optional Nullable!uint outfit;
     @optional Nullable!uint garment;
+    @optional Nullable!string effect;
     @optional Nullable!uint weapon;
     @optional Nullable!uint shield;
     @optional Nullable!int bodyPalette;
@@ -92,6 +93,7 @@ string toString(const scope RenderRequestData data) pure @safe
     if (!data.head.isNull) putSingle(data.head.get, "head");
     if (!data.outfit.isNull) putSingle(data.outfit.get, "outfit");
     if (!data.garment.isNull) putSingle(data.garment.get, "garment");
+    if (!data.effect.isNull) putSingle(data.effect.get, "effect");
     if (!data.weapon.isNull) putSingle(data.weapon.get, "weapon");
     if (!data.shield.isNull) putSingle(data.shield.get, "shield");
     if (!data.bodyPalette.isNull) putSingle(data.bodyPalette.get, "bodyPalette");
@@ -105,4 +107,3 @@ string toString(const scope RenderRequestData data) pure @safe
 
     return app.data[0 .. $ - 2] ~ " }";
 }
-

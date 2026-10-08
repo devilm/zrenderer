@@ -119,3 +119,33 @@ bool isCanvasArgValid(const scope string canvas) pure @safe
     return true;
 }
 
+bool isEffectArgValid(const scope string effect) pure @safe
+{
+    foreach (character; effect)
+    {
+        if (character < 0x20 || character == '/' || character == '\\' ||
+                character == ':' || character == '*' || character == '?' ||
+                character == '"' || character == '<' || character == '>' ||
+                character == '|')
+        {
+            return false;
+        }
+    }
+
+    return effect != "." && effect != ".." &&
+            (effect.length == 0 || (effect[$ - 1] != '.' && effect[$ - 1] != ' '));
+}
+
+unittest
+{
+    assert(isEffectArgValid(""));
+    assert(isEffectArgValid("subject_aura"));
+    assert(isEffectArgValid("2026-aura"));
+    assert(isEffectArgValid("거스트"));
+    assert(isEffectArgValid("한복천사(날개)"));
+    assert(!isEffectArgValid("../subject_aura"));
+    assert(!isEffectArgValid("folder\\effect"));
+    assert(isEffectArgValid("aura effect"));
+    assert(!isEffectArgValid("."));
+    assert(!isEffectArgValid("effect."));
+}

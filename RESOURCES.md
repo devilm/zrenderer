@@ -14,6 +14,7 @@ data\sprite\도람족\*
 data\sprite\방패\*
 data\sprite\로브\*
 data\sprite\악세사리\*
+data\sprite\이팩트\*
 data\sprite\몬스터\*
 data\sprite\homun\*
 data\sprite\npc\*
@@ -49,4 +50,3 @@ data\luafiles514\lua files\offsetitempos\offsetitempos.*
 data\sprite\shadow.*
 ```
 The format is ready to be used for the aforementioned zextractor.
-

@@ -62,5 +62,13 @@ private ubyte[] configToByteArray(uint jobid, immutable(Config) config, immutabl
         buffer[(sz * i) .. (sz * (++i))] = nativeToLittleEndian(config.headgear[h]);
     }
 
+    if (config.effect.length > 0)
+    {
+        import std.digest.crc : crc32Of;
+        import std.string : representation;
+
+        buffer[(sz * i) .. (sz * (++i))] = config.effect.representation.crc32Of;
+    }
+
     return buffer[0 .. (sz * i)];
 }

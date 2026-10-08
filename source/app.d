@@ -161,6 +161,11 @@ string[] process(immutable Config config, LogDg log, LuaState L,
                 outputFilename = jobid == NoJobId ? "none" : jobid.to!string;
             }
 
+            if (config.effect.length > 0 && !config.enableUniqueFilenames)
+            {
+                outputFilename ~= "_" ~ config.effect;
+            }
+
             if (config.returnExistingFiles && config.outputFormat != OutputFormat.zip)
             {
                 string[] existingFiles = existingFilenames(outputFilename, config.outdir, config.outputFormat);
@@ -188,6 +193,8 @@ string[] process(immutable Config config, LogDg log, LuaState L,
                 sprites = processNonPlayer(jobid, log, config, resolve, resManager, L, animationInterval, requestFrame);
             }
 
+            const hasJobSprites = sprites.length > 0;
+
             if (shouldDrawShadow(config.enableShadow, jobid, config.action))
             {
                 log(LogLevel.trace, "Loading Shadow");
@@ -210,6 +217,11 @@ string[] process(immutable Config config, LogDg log, LuaState L,
                 }
 
                 sprites ~= shadowsprite;
+            }
+
+            if (hasJobSprites)
+            {
+                appendEffect(sprites, config, resManager, log, requestFrame);
             }
 
             import draw : RawImage;
@@ -467,6 +479,51 @@ Sprite[] processNonPlayer(uint jobid, LogDg log, immutable Config config, Resolv
     }
 
     return sprites;
+}
+
+private void appendEffect(ref Sprite[] sprites, immutable Config config,
+        ResourceManager resManager, LogDg log, int requestFrame)
+{
+    if (config.effect.length == 0)
+    {
+        return;
+    }
+
+    import std.path : buildPath;
+    import resource : ActResource, ResourceException;
+
+    auto effectPath = buildPath("이팩트", config.effect, config.effect);
+    if (!resManager.exists!ActResource(effectPath))
+    {
+        effectPath = buildPath("이팩트", config.effect);
+    }
+
+    try
+    {
+        auto effect = resManager.getSprite(effectPath, SpriteType.effect);
+        if (effect.act.numberOfFrames(0) == 0)
+        {
+            log(LogLevel.warning, "Effect has no animation frames: " ~ effectPath);
+            return;
+        }
+
+        if (requestFrame < 0)
+        {
+            effect.loadImagesOfAction(0);
+        }
+        else
+        {
+            effect.loadImagesOfFrame(0,
+                    cast(uint) requestFrame % cast(uint) effect.act.numberOfFrames(0));
+        }
+
+        log(LogLevel.trace, "Loading Effect " ~ effectPath);
+        sprites ~= effect;
+    }
+    catch (ResourceException err)
+    {
+        log(LogLevel.warning, err.msg);
+    }
 }
 
 Sprite[] processPlayer(uint jobid, LogDg log, immutable Config config, Resolver resolve,
@@ -930,4 +987,3 @@ private ImfResource imfForJob(uint jobid, const scope Gender gender,
 
     return null;
 }
-

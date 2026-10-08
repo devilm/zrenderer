@@ -133,6 +133,9 @@ struct Config
     @Desc("Garment which should be attached to the players body.")
     uint garment;
 
+    @Desc("Effect folder under data/sprite/이팩트 to render behind the character.")
+    string effect = "";
+
     @Desc("Weapon which should be attached to the players body.")
     uint weapon;
 

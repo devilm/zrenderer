@@ -347,6 +347,10 @@ components:
           minimum: 0
           type: integer
           example: 0
+        effect:
+          description: Effect folder under data/sprite/이팩트 to render behind the character.
+          type: string
+          example: c_aura_of_ghost_s
         weapon:
           format: int32
           description: Weapon which should be attached to the players body.
@@ -565,4 +569,3 @@ components:
       in: header
 security:
   - accessToken: []
-

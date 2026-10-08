@@ -21,10 +21,12 @@ int main(string[] args)
         config = loadConfig!(Config, usage)(args, helpInformation, clc);
 
         import std.exception : enforce;
-        import validation : isJobArgValid, isCanvasArgValid;
+        import validation : isEffectArgValid, isJobArgValid, isCanvasArgValid;
 
         enforce!GetOptException(isJobArgValid(config.job), "job ids are not valid.");
         enforce!GetOptException(isCanvasArgValid(config.canvas), "canvas is not valid.");
+        enforce!GetOptException(isEffectArgValid(config.effect),
+                "effect must be a single resource name, not a path.");
     }
     catch (GetOptException e)
     {
