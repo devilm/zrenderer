@@ -507,6 +507,8 @@ private void appendEffect(ref Sprite[] sprites, immutable Config config,
             return;
         }
 
+        effect.zIndex = -2;
+
         if (requestFrame < 0)
         {
             effect.loadImagesOfAction(0);
