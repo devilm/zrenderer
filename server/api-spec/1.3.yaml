@@ -9,6 +9,26 @@ servers:
       port:
         default: '11011'
 paths:
+  /health:
+    get:
+      responses:
+        '200':
+          description: Service is running.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - up
+                properties:
+                  up:
+                    type: boolean
+                    example: true
+      operationId: getPublicHealth
+      summary: Get public service health status
+      description: Returns a minimal status response without requiring authentication.
+      tags:
+        - Health
   /render:
     summary: Endpoint for requesting to render sprites
     post:

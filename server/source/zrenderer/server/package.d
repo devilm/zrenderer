@@ -83,6 +83,7 @@ int main(string[] args)
     router.post("/admin/tokens/:id", &modifyAccessToken);
     router.delete_("/admin/tokens/:id", &revokeAccessToken);
     router.get("/admin/health", &getHealth);
+    router.get("/health", &getPublicHealth);
 
     if (defaultConfig.enableCORS)
     {
@@ -91,6 +92,7 @@ int main(string[] args)
         router.corsOptionsRoute!("/admin/tokens", "GET, POST");
         router.corsOptionsRoute!("/admin/tokens/:id", "POST, DELETE");
         router.corsOptionsRoute!("/admin/health", "GET");
+        router.corsOptionsRoute!("/health", "GET");
     }
 
     auto settings = new HTTPServerSettings;

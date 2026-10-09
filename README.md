@@ -169,6 +169,21 @@ The repository includes a Compose setup that copies the required character, equi
 The selected resources are baked into the image under `/zren/data`, so rebuild the image after a game patch. Rendered output and access tokens are stored in the local `output` and `secrets` directories. Stop the server with Ctrl+C.
 This image does not include monster, NPC, or homunculus sprites, so requests for those sprite types are not supported by this build.
 
+### Deploying the bundled image to Render
+
+The image must be pushed to a container registry before Render can deploy it. Keep the image private unless you have permission to redistribute the bundled game resources. For GitHub Container Registry, tag and push the locally built image:
+
+```sh
+docker tag zrenderer-zrenderer:latest ghcr.io/<github-user>/zrenderer:resources-v1
+docker push ghcr.io/<github-user>/zrenderer:resources-v1
+```
+
+In Render, create a **Web Service**, select **Existing Image**, and enter the pushed image URL. Add a registry credential if the image is private, choose the **Free** instance type, and create the service. The image listens on Render's `PORT` environment variable (falling back to port `11011` locally) and binds to `0.0.0.0`.
+
+Set the Render service's **Health Check Path** to `/health`. This public endpoint returns only `{"up":true}`; the detailed `/admin/health` endpoint continues to require an access token.
+
+Render Free uses an ephemeral filesystem. Its generated access token file can be lost when the service spins down or restarts, causing a new admin token to be generated and printed in the service logs. The image contains game resources, so check that you have the rights needed to store them in the registry and deploy them to a hosted service before pushing.
+
 ## Dependencies when building
 When building for the first time libpng and lua5.1 will be compiled which require a c-compiler.
 

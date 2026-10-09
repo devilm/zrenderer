@@ -34,6 +34,9 @@ COPY --from=game-data --chown=zren:zren /palette ./data/palette
 COPY --from=game-data --chown=zren:zren /imf ./data/imf
 COPY --from=game-data --chown=zren:zren /luafiles514 ./data/luafiles514
 
+RUN mkdir -p /zren/output /zren/secrets && \
+    chown zren:zren /zren /zren/output /zren/secrets
+
 USER zren
 
-CMD ["./zrenderer-server"]
+CMD ["sh", "-c", "exec ./zrenderer-server --hosts=0.0.0.0 --port=${PORT:-11011} --resourcepath=. --outdir=output --tokenfile=secrets/accesstokens.conf"]

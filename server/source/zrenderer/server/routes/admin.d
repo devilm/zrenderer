@@ -290,3 +290,8 @@ void getHealth(HTTPServerRequest req, HTTPServerResponse res) @trusted
 
     res.writeJsonBody(reply);
 }
+
+void getPublicHealth(HTTPServerRequest req, HTTPServerResponse res) @safe
+{
+    res.writeJsonBody(Json(["up": Json(true)]));
+}
