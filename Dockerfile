@@ -39,4 +39,4 @@ RUN mkdir -p /zren/output /zren/secrets && \
 
 USER zren
 
-CMD ["sh", "-c", "exec ./zrenderer-server --hosts=0.0.0.0 --port=${PORT:-11011} --resourcepath=. --outdir=output --tokenfile=secrets/accesstokens.conf"]
+CMD ["sh", "-c", "exec ./zrenderer-server --hosts=0.0.0.0 --port=${PORT:-11011} --resourcepath=. --outdir=output --tokenfile=secrets/accesstokens.conf --enableCORS=true --allowCORSOrigin=https://devilm.github.io"]

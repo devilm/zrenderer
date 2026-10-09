@@ -182,6 +182,10 @@ In Render, create a **Web Service**, select **Existing Image**, and enter the pu
 
 Set the Render service's **Health Check Path** to `/health`. This public endpoint returns only `{"up":true}`; the detailed `/admin/health` endpoint continues to require an access token.
 
+The container enables CORS only for `https://devilm.github.io`, so its browser-based frontend can call the API. Other origins are not enabled by default.
+
+After changing the server or bundled resources, rebuild and push a new image tag. For an existing Render image-backed service, update its image reference to the new tag or select **Manual Deploy > Deploy latest reference**; pushing an updated image does not trigger a deploy automatically.
+
 Render Free uses an ephemeral filesystem. Its generated access token file can be lost when the service spins down or restarts, causing a new admin token to be generated and printed in the service logs. The image contains game resources, so check that you have the rights needed to store them in the registry and deploy them to a hosted service before pushing.
 
 ## Dependencies when building
