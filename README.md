@@ -108,7 +108,7 @@ Same as CLI
 The server will listen on the _hosts_, bind to _port_, write its logs to _logfile_ and read the access tokens from the _tokenfile_.
 
 When running the server for the first time and no access token file has been specified the server will automatically generate one
-and print the token to the console. You will need that token to make requests to the server.
+and print the token to the console. The token is used for protected endpoints; `POST /render` can be called without one. If a valid token is supplied to `/render`, its configured request limits are applied; an absent or invalid token is treated as public access.
 
 You can find the openApi specifications here: [OpenAPI specifications](https://github.com/zhad3/zrenderer/tree/main/server/api-spec).
 
@@ -180,9 +180,9 @@ docker push ghcr.io/<github-user>/zrenderer:resources-v1
 
 In Render, create a **Web Service**, select **Existing Image**, and enter the pushed image URL. Add a registry credential if the image is private, choose the **Free** instance type, and create the service. The image listens on Render's `PORT` environment variable (falling back to port `11011` locally) and binds to `0.0.0.0`.
 
-Set the Render service's **Health Check Path** to `/health`. This public endpoint returns only `{"up":true}`; the detailed `/admin/health` endpoint continues to require an access token.
+Set the Render service's **Health Check Path** to `/health`. This public endpoint returns only `{"up":true}`; the detailed `/admin/health` endpoint continues to require an access token. `POST /render` is public and does not require a token.
 
-The container enables CORS only for `https://devilm.github.io`, so its browser-based frontend can call the API. Other origins are not enabled by default.
+The container enables CORS only for `https://devilm.github.io`, so its browser-based frontend can call the API. Other origins are not enabled by default. CORS only restricts browser-based cross-origin access; it does not prevent calls from scripts or other servers. Since rendering is public, anyone who can reach the service can submit render requests.
 
 After changing the server or bundled resources, rebuild and push a new image tag. For an existing Render image-backed service, update its image reference to the new tag or select **Manual Deploy > Deploy latest reference**; pushing an updated image does not trigger a deploy automatically.
 

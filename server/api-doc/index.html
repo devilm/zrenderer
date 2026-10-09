@@ -189,7 +189,7 @@ font-style: italic;
     <div class="license-url">http://apache.org/licenses/LICENSE-2.0.html</div>
   <h2>Access</h2>
     <ol>
-      <li>APIKey KeyParamName:x-accesstoken KeyInQuery:false KeyInHeader:true</li>
+      <li>APIKey KeyParamName:x-accesstoken KeyInQuery:false KeyInHeader:true (required only for protected endpoints)</li>
     </ol>
 
   <h2><a name="__Methods">Methods</a></h2>
@@ -533,7 +533,7 @@ font-style: italic;
     <a class="up" href="#__Methods">Up</a>
     <pre class="post"><code class="huge"><span class="http-method">post</span> /render</code></pre></div>
     <div class="method-summary">Send a request to render sprites (<span class="nickname">render</span>)</div>
-    <div class="method-notes"></div>
+    <div class="method-notes">Authentication is optional. A valid access token applies its configured request limits; requests without a valid token can render publicly.</div>
 
 
     <h3 class="field-label">Consumes</h3>
@@ -594,9 +594,6 @@ font-style: italic;
         <a href="#RenderResponse">RenderResponse</a>
     <h4 class="field-label">400</h4>
     Illegal input for operation.
-        <a href="#GenericResponse">GenericResponse</a>
-    <h4 class="field-label">401</h4>
-    Unauthorized.
         <a href="#GenericResponse">GenericResponse</a>
     <h4 class="field-label">500</h4>
     Server Error.

@@ -17,17 +17,15 @@ import vibe.http.status;
 import zrenderer.server.auth : AccessToken, checkAuth;
 import zrenderer.server.dto : RenderRequestData, RenderResponseData, toString;
 import zrenderer.server.globals : defaultConfig, accessTokens;
-import zrenderer.server.routes : setErrorResponse, mergeStruct, unauthorized, logCustomRequest;
+import zrenderer.server.routes : setErrorResponse, mergeStruct, logCustomRequest;
 import zrenderer.server.worker : renderWorker;
 
 void handleRenderRequest(HTTPServerRequest req, HTTPServerResponse res) @trusted
 {
-    immutable accessToken = checkAuth(req, accessTokens);
-
-    if (accessToken.isNull() || !accessToken.get.isValid)
+    auto accessToken = checkAuth(req, accessTokens);
+    if (!accessToken.isNull && !accessToken.get.isValid)
     {
-        unauthorized(res);
-        return;
+        accessToken = Nullable!AccessToken.init;
     }
 
     if (req.json == Json.undefined)
@@ -52,7 +50,10 @@ void handleRenderRequest(HTTPServerRequest req, HTTPServerResponse res) @trusted
 
     const(Config) mergedConfig = mergeStruct(defaultConfig, requestData);
 
-    if (!isJobArgValid(mergedConfig.job, accessToken.get.properties.maxJobIdsPerRequest))
+    const maxJobIdsPerRequest = accessToken.isNull
+        ? -1
+        : accessToken.get.properties.maxJobIdsPerRequest;
+    if (!isJobArgValid(mergedConfig.job, maxJobIdsPerRequest))
     {
         setErrorResponse(res, HTTPStatus.badRequest, "Invalid job element");
         return;

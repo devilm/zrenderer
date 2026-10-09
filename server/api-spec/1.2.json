@@ -9,6 +9,7 @@
     "/render": {
       "summary": "Endpoint for requesting to render sprites",
       "post": {
+        "description": "Rendering is public and does not require an access token. A valid token, if supplied, applies its configured request limits; requests without a valid token are treated as public.",
         "requestBody": {
           "$ref": "#/components/requestBodies/renderRequestBody"
         },
@@ -28,9 +29,6 @@
           },
           "400": {
             "$ref": "#/components/responses/400"
-          },
-          "401": {
-            "$ref": "#/components/responses/401"
           },
           "500": {
             "$ref": "#/components/responses/500"
@@ -263,7 +261,7 @@
     "securitySchemes": {
       "Access Token": {
         "type": "apiKey",
-        "description": "Token required to make requests.",
+        "description": "Optional for /render; access token for protected requests.",
         "name": "accesstoken",
         "in": "query"
       }

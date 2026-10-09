@@ -11,6 +11,7 @@ servers:
 paths:
   /health:
     get:
+      security: []
       responses:
         '200':
           description: Service is running.
@@ -32,6 +33,8 @@ paths:
   /render:
     summary: Endpoint for requesting to render sprites
     post:
+      security: []
+      description: Rendering is public and does not require an access token. A valid token, if supplied, applies its configured request limits; requests without a valid token are treated as public. CORS is not an access-control mechanism; requests from non-browser clients are also possible.
       requestBody:
         $ref: '#/components/requestBodies/RenderRequestBody'
       parameters:
@@ -65,8 +68,6 @@ paths:
           description: 'Ok'
         '400':
           $ref: '#/components/responses/400'
-        '401':
-          $ref: '#/components/responses/401'
         '500':
           $ref: '#/components/responses/500'
       operationId: render
@@ -584,7 +585,7 @@ components:
   securitySchemes:
     accessToken:
       type: apiKey
-      description: Access token required to make requests.
+      description: Access token for protected requests; not required for /render or /health.
       name: x-accesstoken
       in: header
 security:
