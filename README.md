@@ -158,6 +158,16 @@ You will need to provide three directory/files:
 - The output directory where the server will store the images
 - The resource directory where all the assets from Ragnarok Online reside in
 
+### Local development with Docker Compose
+
+The repository includes a Compose setup for running the server against a local resource directory without adding those game files to the image.
+
+1. Copy `.env.example` to `.env` and set `GAME_DATA_PATH` to the game data directory. The directory should contain folders such as `sprite`, `palette`, `imf`, and `luafiles514` (for example, `C:\Users\<user>\Downloads\data`).
+2. Start the server with `docker compose up --build`.
+3. The server listens at `http://localhost:11011`. On first startup, it prints an admin access token; the token file is stored in `secrets` and survives container restarts.
+
+The resource directory is mounted read-only at `/zren/data`. Rendered output and access tokens are stored in the local `output` and `secrets` directories. Stop the server with Ctrl+C.
+
 ## Dependencies when building
 When building for the first time libpng and lua5.1 will be compiled which require a c-compiler.
 

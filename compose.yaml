@@ -1,0 +1,24 @@
+services:
+  zrenderer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "11011:11011"
+    volumes:
+      - type: bind
+        source: ${GAME_DATA_PATH:?Set GAME_DATA_PATH in .env}
+        target: /zren/data
+        read_only: true
+      - type: bind
+        source: ./output
+        target: /zren/output
+      - type: bind
+        source: ./secrets
+        target: /zren/secrets
+      - type: bind
+        source: ./zrenderer.local.conf
+        target: /zren/zrenderer.conf
+        read_only: true
+    user: "0:0"
+    restart: unless-stopped

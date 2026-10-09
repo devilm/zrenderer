@@ -18,4 +18,4 @@ zrenderer.conf
 output/
 accesstokens.conf
 secrets/
-
+.env
