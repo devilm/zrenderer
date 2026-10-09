@@ -6,6 +6,7 @@ RUN apk update && \
 
 WORKDIR /zrenderer
 COPY . .
+RUN sed -i 's/\r$//' LuaD/build_clibs.sh
 RUN dub clean && dub build --build=release --config=docker --force :server
 
 
@@ -22,8 +23,17 @@ RUN apk update && \
 WORKDIR /zren
 COPY --from=build --chown=zren:zren /zrenderer/bin/zrenderer-server .
 COPY --from=build --chown=zren:zren /zrenderer/resolver_data ./resolver_data
+COPY --from=game-data --chown=zren:zren /sprite/인간족 ./data/sprite/인간족
+COPY --from=game-data --chown=zren:zren /sprite/도람족 ./data/sprite/도람족
+COPY --from=game-data --chown=zren:zren /sprite/방패 ./data/sprite/방패
+COPY --from=game-data --chown=zren:zren /sprite/로브 ./data/sprite/로브
+COPY --from=game-data --chown=zren:zren /sprite/악세사리 ./data/sprite/악세사리
+COPY --from=game-data --chown=zren:zren /sprite/이팩트 ./data/sprite/이팩트
+COPY --from=game-data --chown=zren:zren /sprite/shadow.* ./data/sprite/
+COPY --from=game-data --chown=zren:zren /palette ./data/palette
+COPY --from=game-data --chown=zren:zren /imf ./data/imf
+COPY --from=game-data --chown=zren:zren /luafiles514 ./data/luafiles514
 
 USER zren
 
 CMD ["./zrenderer-server"]
-

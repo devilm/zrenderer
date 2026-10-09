@@ -3,13 +3,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      additional_contexts:
+        game-data: ${GAME_DATA_PATH:?Set GAME_DATA_PATH in .env}
     ports:
       - "11011:11011"
     volumes:
-      - type: bind
-        source: ${GAME_DATA_PATH:?Set GAME_DATA_PATH in .env}
-        target: /zren/data
-        read_only: true
       - type: bind
         source: ./output
         target: /zren/output
