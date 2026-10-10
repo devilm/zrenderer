@@ -21,12 +21,15 @@ int main(string[] args)
         config = loadConfig!(Config, usage)(args, helpInformation, clc);
 
         import std.exception : enforce;
-        import validation : isEffectArgValid, isJobArgValid, isCanvasArgValid;
+        import validation : isEffectArgValid, isJobArgValid, isCanvasArgValid,
+            isTextureArgValid;
 
         enforce!GetOptException(isJobArgValid(config.job), "job ids are not valid.");
         enforce!GetOptException(isCanvasArgValid(config.canvas), "canvas is not valid.");
         enforce!GetOptException(isEffectArgValid(config.effect),
                 "effect must be a single resource name, not a path.");
+        enforce!GetOptException(isTextureArgValid(config.texture),
+                "texture must be a relative path to a STR file under the data directory.");
     }
     catch (GetOptException e)
     {

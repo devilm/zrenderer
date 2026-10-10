@@ -33,6 +33,8 @@ COPY --from=game-data --chown=zren:zren /sprite/shadow.* ./data/sprite/
 COPY --from=game-data --chown=zren:zren /palette ./data/palette
 COPY --from=game-data --chown=zren:zren /imf ./data/imf
 COPY --from=game-data --chown=zren:zren /luafiles514 ./data/luafiles514
+COPY --from=game-data --chown=zren:zren /palette ./data/palette
+COPY --from=game-data --chown=zren:zren /texture ./data/texture
 
 RUN mkdir -p /zren/output /zren/secrets && \
     chown zren:zren /zren /zren/output /zren/secrets

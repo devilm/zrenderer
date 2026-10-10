@@ -136,6 +136,66 @@ bool isEffectArgValid(const scope string effect) pure @safe
             (effect.length == 0 || (effect[$ - 1] != '.' && effect[$ - 1] != ' '));
 }
 
+bool isTextureArgValid(const scope string texture) pure @safe
+{
+    if (texture.length == 0)
+    {
+        return true;
+    }
+
+    if (texture[0] == '/' || texture[0] == '\\')
+    {
+        return false;
+    }
+
+    foreach (character; texture)
+    {
+        if (character < 0x20 || character == ':' || character == '*' ||
+                character == '?' || character == '"' || character == '<' ||
+                character == '>' || character == '|')
+        {
+            return false;
+        }
+    }
+
+    import std.string : toLower;
+
+    bool hasStrExtension = false;
+    bool hasTextureRoot = false;
+    size_t segmentCount;
+    string lastSegment;
+    string normalized;
+    foreach (character; texture)
+    {
+        normalized ~= character == '\\' ? '/' : character;
+    }
+
+    import std.algorithm.iteration : splitter;
+    foreach (segment; normalized.splitter('/'))
+    {
+        const index = segmentCount;
+        ++segmentCount;
+        lastSegment = segment.idup;
+        if (segment.length == 0 || segment == "." || segment == "..")
+        {
+            return false;
+        }
+        if (index == 0 && segment != "texture")
+        {
+            return false;
+        }
+        if (index == 0)
+        {
+            hasTextureRoot = segment == "texture";
+            continue;
+        }
+    }
+
+    hasStrExtension = lastSegment.length >= 4 &&
+        lastSegment[$ - 4 .. $].toLower == ".str";
+    return hasTextureRoot && segmentCount >= 2 && hasStrExtension;
+}
+
 unittest
 {
     assert(isEffectArgValid(""));
@@ -148,4 +208,11 @@ unittest
     assert(isEffectArgValid("aura effect"));
     assert(!isEffectArgValid("."));
     assert(!isEffectArgValid("effect."));
+    assert(isTextureArgValid(""));
+    assert(isTextureArgValid("texture\\effect\\c_released_ground\\ki.str"));
+    assert(isTextureArgValid("texture/effect/ki.STR"));
+    assert(!isTextureArgValid("../texture/effect/ki.str"));
+    assert(!isTextureArgValid("texture\\..\\ki.str"));
+    assert(!isTextureArgValid("C:\\data\\ki.str"));
+    assert(!isTextureArgValid("texture\\effect\\ki.bmp"));
 }

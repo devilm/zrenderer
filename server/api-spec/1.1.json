@@ -95,6 +95,11 @@
             "type": "string",
             "example": "c_aura_of_ghost_s"
           },
+          "texture": {
+            "description": "Relative path to an STR texture effect under the data directory.",
+            "type": "string",
+            "example": "texture/effect/c_released_ground/ki.str"
+          },
           "weapon": {
             "format": "int32",
             "description": "Weapon which should be attached to the players body.",

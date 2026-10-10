@@ -4,6 +4,7 @@ import sprite;
 import draw : Color, RawImage, DrawObject, Canvas;
 import linearalgebra : TransformMatrix, Box, Vector3, Matrix3, inverse, PI_180;
 import imageformats.png;
+import textureeffect : TextureEffect;
 
 import std.stdio : writefln;
 
@@ -139,7 +140,8 @@ RawImage[] drawAction(scope Sprite sprite, uint action)
 alias sortDelegate = void delegate(ref int[] index, uint frame, ulong maxframes);
 
 RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
-        sortDelegate sortDg, immutable(Canvas) canvas)
+        sortDelegate sortDg, immutable(Canvas) canvas,
+        TextureEffect textureEffect = null)
 {
     DrawObject[] drawobjects;
     drawobjects.reserve(sprites.length);
@@ -193,15 +195,52 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
         drawobjects ~= drawobject;
     }
 
+    ulong outputFrames = maxframes;
+    Box textureAnchorBounds;
+    textureAnchorBounds.toInfinity();
+    foreach (i, sprite; sprites)
+    {
+        if (sprite.type == SpriteType.playerbody)
+        {
+            textureAnchorBounds = drawobjects[i].boundingBox;
+            break;
+        }
+    }
+    if (textureAnchorBounds.isInfinite)
+    {
+        textureAnchorBounds = totalBoundingBox;
+    }
+    const textureAnchorX = (textureAnchorBounds.x1 + textureAnchorBounds.x2) / 2;
+    const textureAnchorY = textureAnchorBounds.y2;
+    const texturePositionX = textureEffect is null ? 0 :
+        textureAnchorX - (textureEffect.bounds.x1 + textureEffect.bounds.x2) / 2;
+    const texturePositionY = textureEffect is null ? 0 :
+        textureAnchorY - (textureEffect.bounds.y1 + textureEffect.bounds.y2) / 2;
+    if (textureEffect !is null)
+    {
+        totalBoundingBox.updateBounds(
+                textureEffect.bounds.x1 + texturePositionX,
+                textureEffect.bounds.y1 + texturePositionY,
+                textureEffect.bounds.x2 + texturePositionX,
+                textureEffect.bounds.y2 + texturePositionY);
+
+        if (!drawSingleFrame)
+        {
+            import std.algorithm : max;
+
+            outputFrames = max(outputFrames, textureEffect.frameCount);
+        }
+    }
+
     const totalWidth = canvas != Canvas.init ? canvas.width : totalBoundingBox.width;
     const totalHeight = canvas != Canvas.init ? canvas.height : totalBoundingBox.height;
 
-    if (totalWidth == 0 || totalHeight == 0)
+    if (totalWidth == 0 || totalHeight == 0 || outputFrames <= startframe)
     {
         return [];
     }
 
-    RawImage[] outputImage = new RawImage[maxframes - startframe];
+    RawImage[] outputImage = new RawImage[outputFrames - startframe];
 
     const offset = Vector3(
             canvas != Canvas.init ? -canvas.originx : totalBoundingBox.x1,
@@ -212,7 +251,7 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
 
     int[] sortIndex = new int[sprites.length];
 
-    for (auto i = startframe; i < maxframes; ++i)
+    for (auto i = startframe; i < outputFrames; ++i)
     {
         outputImage[i - startframe].width = totalWidth;
         outputImage[i - startframe].height = totalHeight;
@@ -220,6 +259,7 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
 
         sortDg(sortIndex, cast(uint) i, maxframes);
 
+        bool textureDrawn;
         for (auto d = 0; d < sortIndex.length; ++d)
         {
             import std.conv : to;
@@ -236,6 +276,14 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
             ulong frameoffset = 0; // Offset for animated headgears
 
             const sprite = sprites[sortIndex[d]];
+
+            if (!textureDrawn && textureEffect !is null && sprite.zIndex >= 0)
+            {
+                textureEffect.draw(outputImage[i - startframe], cast(uint) i,
+                        cast(int) (-offset.x + texturePositionX),
+                        cast(int) (-offset.y + texturePositionY));
+                textureDrawn = true;
+            }
 
             const playerAction = intToPlayerAction(action);
 
@@ -309,6 +357,14 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
 
             drawFrameOnImage(outputImage[i - startframe], sprites[sortIndex[d]], actionindex,
                     cast(uint) (frameindex + frameoffset), frameobj, offset);
+
+        }
+
+        if (!textureDrawn && textureEffect !is null)
+        {
+            textureEffect.draw(outputImage[i - startframe], cast(uint) i,
+                    cast(int) (-offset.x + texturePositionX),
+                    cast(int) (-offset.y + texturePositionY));
 
             debug(outline)
             {

@@ -136,6 +136,9 @@ struct Config
     @Desc("Effect folder under data/sprite/이팩트 to render behind the character.")
     string effect = "";
 
+    @Desc("STR texture effect path relative to the data directory, e.g. texture/effect/c_released_ground/ki.str.")
+    string texture = "";
+
     @Desc("Weapon which should be attached to the players body.")
     uint weapon;
 

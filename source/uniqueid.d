@@ -18,7 +18,7 @@ string createUid(uint jobid, immutable(Config) config, immutable(Canvas) canvas)
 private ubyte[] configToByteArray(uint jobid, immutable(Config) config, immutable(Canvas) canvas) pure nothrow @safe
 {
     immutable sz = int.sizeof;
-    auto buffer = new ubyte[sz * 24];
+    auto buffer = new ubyte[sz * 25];
 
     auto i = 0;
 
@@ -68,6 +68,14 @@ private ubyte[] configToByteArray(uint jobid, immutable(Config) config, immutabl
         import std.string : representation;
 
         buffer[(sz * i) .. (sz * (++i))] = config.effect.representation.crc32Of;
+    }
+
+    if (config.texture.length > 0)
+    {
+        import std.digest.crc : crc32Of;
+        import std.string : representation;
+
+        buffer[(sz * i) .. (sz * (++i))] = config.texture.representation.crc32Of;
     }
 
     return buffer[0 .. (sz * i)];

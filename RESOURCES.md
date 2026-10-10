@@ -32,8 +32,6 @@ data\luafiles514\lua files\datainfo\jobidentity.*
 data\luafiles514\lua files\datainfo\npcidentity.*
 data\luafiles514\lua files\datainfo\jobname.*
 data\luafiles514\lua files\datainfo\jobname_f.*
-data\luafiles514\lua files\datainfo\shadowtable.*
-data\luafiles514\lua files\datainfo\shadowtable_f.*
 data\luafiles514\lua files\skillinfoz\jobinheritlist.*
 data\luafiles514\lua files\spreditinfo\2dlayerdir_f.*
 data\luafiles514\lua files\spreditinfo\biglayerdir_female.*

@@ -9,6 +9,7 @@ import resource : ResourceManager, ResourceException, ImfResource;
 import sprite;
 import std.zip : ZipArchive;
 import validation;
+import textureeffect : TextureEffect, TextureEffectException, loadTextureEffect;
 
 void createOutputDirectory(string outputDirectory) @safe
 {
@@ -74,6 +75,8 @@ string[] run(immutable Config config, LogDg log, LuaState L = null,
 string[] process(immutable Config config, LogDg log, LuaState L,
         ResourceManager resManager, Resolver resolve)
 {
+    import std.file : FileException;
+
     string[] filenames;
 
     immutable(Canvas) canvas = canvasFromString(config.canvas);
@@ -117,6 +120,23 @@ string[] process(immutable Config config, LogDg log, LuaState L,
             {
                 return existingFiles;
             }
+        }
+    }
+
+    TextureEffect textureEffect;
+    if (config.texture.length > 0)
+    {
+        try
+        {
+            textureEffect = loadTextureEffect(config.texture, config.resourcepath);
+        }
+        catch (TextureEffectException err)
+        {
+            log(LogLevel.error, "Unable to load texture effect " ~ config.texture ~ ": " ~ err.msg);
+        }
+        catch (FileException err)
+        {
+            log(LogLevel.error, "Unable to read texture effect " ~ config.texture ~ ": " ~ err.msg);
         }
     }
 
@@ -164,6 +184,13 @@ string[] process(immutable Config config, LogDg log, LuaState L,
             if (config.effect.length > 0 && !config.enableUniqueFilenames)
             {
                 outputFilename ~= "_" ~ config.effect;
+            }
+            if (textureEffect !is null && !config.enableUniqueFilenames)
+            {
+                import std.digest.crc : crc32Of, crcHexString;
+                import std.string : representation;
+
+                outputFilename ~= "_texture-" ~ crcHexString(config.texture.representation.crc32Of);
             }
 
             if (config.returnExistingFiles && config.outputFormat != OutputFormat.zip)
@@ -259,7 +286,8 @@ string[] process(immutable Config config, LogDg log, LuaState L,
             }
 
             RawImage[] images = drawPlayer(sprites, config.action,
-                    (requestFrame < 0) ? uint.max : requestFrame, &sortIndexDelegate, canvas);
+                    (requestFrame < 0) ? uint.max : requestFrame, &sortIndexDelegate, canvas,
+                    textureEffect);
 
             if (isBaby(jobid))
             {
@@ -481,6 +509,65 @@ Sprite[] processNonPlayer(uint jobid, LogDg log, immutable Config config, Resolv
     return sprites;
 }
 
+private string resolveEffectPath(string effect, string resourcePath,
+        ResourceManager resManager, out bool ambiguous)
+{
+    import std.path : buildPath;
+    import resource : ActResource, SprResource;
+
+    ambiguous = false;
+
+    auto effectPath = buildPath("이팩트", effect, effect);
+    if (resManager.exists!ActResource(effectPath) &&
+            resManager.exists!SprResource(effectPath))
+    {
+        return effectPath;
+    }
+
+    effectPath = buildPath("이팩트", effect);
+    if (resManager.exists!ActResource(effectPath) &&
+            resManager.exists!SprResource(effectPath))
+    {
+        return effectPath;
+    }
+
+    auto blueVariantPath = buildPath("이팩트", effect, effect ~ "_blue");
+    if (resManager.exists!ActResource(blueVariantPath) &&
+            resManager.exists!SprResource(blueVariantPath))
+    {
+        return blueVariantPath;
+    }
+
+    import std.algorithm : filter, map;
+    import std.array : array;
+    import std.file : dirEntries, exists, SpanMode;
+    import std.path : baseName, relativePath;
+
+    auto spritePath = buildPath(resourcePath, "data", "sprite");
+    auto effectsPath = buildPath(spritePath, "이팩트");
+    string[] matches;
+    if (exists(effectsPath))
+    {
+        matches = dirEntries(effectsPath, "*.act", SpanMode.depth, false)
+            .filter!(entry => baseName(entry.name) == effect ~ ".act")
+            .map!(entry => relativePath(entry.name[0 .. $ - 4], spritePath))
+            .filter!(path => resManager.exists!SprResource(path))
+            .array;
+    }
+
+    if (matches.length == 1)
+    {
+        return matches[0];
+    }
+
+    if (matches.length > 1)
+    {
+        ambiguous = true;
+    }
+
+    return buildPath("이팩트", effect);
+}
+
 private void appendEffect(ref Sprite[] sprites, immutable Config config,
         ResourceManager resManager, LogDg log, int requestFrame)
 {
@@ -489,17 +576,20 @@ private void appendEffect(ref Sprite[] sprites, immutable Config config,
         return;
     }
 
-    import std.path : buildPath;
-    import resource : ActResource, ResourceException;
-
-    auto effectPath = buildPath("이팩트", config.effect, config.effect);
-    if (!resManager.exists!ActResource(effectPath))
-    {
-        effectPath = buildPath("이팩트", config.effect);
-    }
+    import resource : ResourceException;
+    import std.file : FileException;
 
     try
     {
+        bool ambiguous;
+        auto effectPath = resolveEffectPath(config.effect, config.resourcepath,
+                resManager, ambiguous);
+        if (ambiguous)
+        {
+            log(LogLevel.warning, "Effect name matches multiple resources: " ~ config.effect);
+            return;
+        }
+
         auto effect = resManager.getSprite(effectPath, SpriteType.effect);
         if (effect.act.numberOfFrames(0) == 0)
         {
@@ -526,6 +616,60 @@ private void appendEffect(ref Sprite[] sprites, immutable Config config,
     {
         log(LogLevel.warning, err.msg);
     }
+    catch (FileException err)
+    {
+        log(LogLevel.warning, err.msg);
+    }
+}
+
+unittest
+{
+    import std.file : mkdirRecurse, rmdirRecurse, tempDir;
+    import std.path : buildPath;
+    import std.stdio : File;
+    import std.uuid : randomUUID;
+
+    auto resourcePath = buildPath(tempDir, "zrenderer-effect-" ~ randomUUID.toString);
+    scope (exit) rmdirRecurse(resourcePath);
+
+    auto effectFolder = buildPath(resourcePath, "data", "sprite", "이팩트",
+            "su_spritemable");
+    mkdirRecurse(effectFolder);
+
+    void createPair(string folder, string name)
+    {
+        auto act = File(buildPath(folder, name ~ ".act"), "w");
+        act.close();
+        auto spr = File(buildPath(folder, name ~ ".spr"), "w");
+        spr.close();
+    }
+
+    createPair(effectFolder, "su_spritemable_blue");
+    createPair(effectFolder, "su_spritemable_green");
+    createPair(effectFolder, "su_spritemable_red");
+
+    auto resManager = new ResourceManager(resourcePath);
+    bool ambiguous;
+    assert(resolveEffectPath("su_spritemable", resourcePath, resManager, ambiguous) ==
+            buildPath("이팩트", "su_spritemable", "su_spritemable_blue"));
+    assert(!ambiguous);
+    assert(resolveEffectPath("su_spritemable_green", resourcePath, resManager, ambiguous) ==
+            buildPath("이팩트", "su_spritemable", "su_spritemable_green"));
+    assert(!ambiguous);
+    assert(resolveEffectPath("su_spritemable_red", resourcePath, resManager, ambiguous) ==
+            buildPath("이팩트", "su_spritemable", "su_spritemable_red"));
+    assert(!ambiguous);
+
+    auto duplicateFolder = buildPath(resourcePath, "data", "sprite", "이팩트", "other");
+    mkdirRecurse(duplicateFolder);
+    createPair(duplicateFolder, "su_spritemable_green");
+    resolveEffectPath("su_spritemable_green", resourcePath, resManager, ambiguous);
+    assert(ambiguous);
+
+    createPair(effectFolder, "su_spritemable");
+    assert(resolveEffectPath("su_spritemable", resourcePath, resManager, ambiguous) ==
+            buildPath("이팩트", "su_spritemable", "su_spritemable"));
+    assert(!ambiguous);
 }
 
 Sprite[] processPlayer(uint jobid, LogDg log, immutable Config config, Resolver resolve,

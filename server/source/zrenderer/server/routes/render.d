@@ -4,7 +4,8 @@ import config;
 import std.datetime : seconds;
 import std.typecons : Nullable;
 import std.zip : ArchiveMember, ZipArchive;
-import validation : isEffectArgValid, isJobArgValid, isCanvasArgValid;
+import validation : isEffectArgValid, isJobArgValid, isCanvasArgValid,
+    isTextureArgValid;
 import vibe.core.concurrency : send, receiveTimeout, OwnerTerminated;
 import vibe.core.core : runWorkerTaskH;
 import vibe.core.log : logInfo, logError;
@@ -68,6 +69,12 @@ void handleRenderRequest(HTTPServerRequest req, HTTPServerResponse res) @trusted
     if (!isEffectArgValid(mergedConfig.effect))
     {
         setErrorResponse(res, HTTPStatus.badRequest, "Invalid effect element");
+        return;
+    }
+
+    if (!isTextureArgValid(mergedConfig.texture))
+    {
+        setErrorResponse(res, HTTPStatus.badRequest, "Invalid texture element");
         return;
     }
 

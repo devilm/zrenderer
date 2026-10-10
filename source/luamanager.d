@@ -1,6 +1,6 @@
 module luamanager;
 
-import std.typecons : Flag, No, Yes;
+import std.typecons : Flag, No;
 import luad.state : LuaState;
 import resource : ResourceManager;
 import linearalgebra : Vector2;
@@ -12,7 +12,6 @@ bool[string] luaFunctionAvailability;
 void loadRequiredLuaFiles(ref LuaState L, ResourceManager resManager, LogDg log)
 {
     luaFunctionAvailability = [
-        "ReqshadowFactor": true,
         "OffsetItemPos_GetOffsetForDoram": true,
         "ReqJobName": true,
         "ReqWeaponName": true,
@@ -35,8 +34,6 @@ void loadRequiredLuaFiles(ref LuaState L, ResourceManager resManager, LogDg log)
     luaLoader("datainfo/jobidentity", resManager, L, log);
     luaLoader("datainfo/jobname", resManager, L, log);
     luaLoader("datainfo/jobname_f", resManager, L, log);
-    luaLoader("datainfo/shadowtable", resManager, L, log, Yes.optional);
-    luaLoader("datainfo/shadowtable_f", resManager, L, log, Yes.optional);
     luaLoader("skillinfoz/jobinheritlist", resManager, L, log);
     luaLoader("spreditinfo/2dlayerdir_f", resManager, L, log);
     luaLoader("spreditinfo/biglayerdir_female", resManager, L, log);
@@ -152,4 +149,3 @@ auto headgearOffsetForDoram(uint headgear, uint direction, const Gender gender, 
 
     return Point.init;
 }
-

@@ -35,6 +35,7 @@ A tool to render sprites from Ragnarok Online
                 --headgear Headgears which should be attached to the players head. Can contain up to 3 comma separated values. Default: 
                  --garment Garment which should be attached to the players body. Default: 0
                   --effect Effect folder under data/sprite/이팩트 to render behind the character. Default:
+                --texture STR effect file under data/texture. Use a relative path such as texture/effect/c_released_ground/ki.str. Default:
                  --weapon Weapon which should be attached to the players body. Default: 0
                   --shield Shield which should be attached to the players body. Default: 0
 -a                --action Action of the job which should be drawn. Default: 0
@@ -66,8 +67,22 @@ Options _hosts_, _port_, _logfile_ and _tokenfile_ are ignored for the CLI tool.
 If not otherwise specified the requested sprites will be renderered as an APNG animation of the first action (0, Stand).
 
 To render an effect from either `data/sprite/이팩트/<name>/<name>.act` and `.spr` or
-root-level `data/sprite/이팩트/<name>.act` and `.spr`, pass its name:
+root-level `data/sprite/이팩트/<name>.act` and `.spr`, pass its name. Effects stored as
+named variants in a subfolder can be selected by their filename without the extension.
+For example, `--effect=su_spritemable_green` selects
+`data/sprite/이팩트/su_spritemable/su_spritemable_green.{act,spr}`. Passing
+`--effect=su_spritemable` selects the blue variant by default when no
+`su_spritemable.{act,spr}` pair is present:
+`./zrenderer --job=1 --effect=su_spritemable_green`
+
+To render a standard effect:
 `./zrenderer --job=1 --effect=c_aura_of_ghost_s`
+
+To render the STR texture effect used by headgear 2136 alongside a character:
+`./zrenderer --job=1 --headgear=2136 --texture="texture\effect\c_released_ground\ki.str"`
+
+STR textures are composited over the rendered character and animated across the STR's frames.
+The texture path is relative to the configured resource directory's `data` folder.
 
 **Render monster with id 1001 (Scorpion) with action 0 (Stand, default)**  
 `./zrenderer --job=1001`  
