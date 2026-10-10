@@ -213,9 +213,9 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
     const textureAnchorX = (textureAnchorBounds.x1 + textureAnchorBounds.x2) / 2;
     const textureAnchorY = textureAnchorBounds.y2;
     const texturePositionX = textureEffect is null ? 0 :
-        textureAnchorX - (textureEffect.bounds.x1 + textureEffect.bounds.x2) / 2;
+        textureAnchorX - (textureEffect.anchorBounds.x1 + textureEffect.anchorBounds.x2) / 2;
     const texturePositionY = textureEffect is null ? 0 :
-        textureAnchorY - (textureEffect.bounds.y1 + textureEffect.bounds.y2) / 2;
+        textureAnchorY - (textureEffect.anchorBounds.y1 + textureEffect.anchorBounds.y2) / 2;
     if (textureEffect !is null)
     {
         totalBoundingBox.updateBounds(

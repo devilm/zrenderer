@@ -37,12 +37,14 @@ class TextureEffect
 
     uint frameCount;
     Box bounds;
+    Box anchorBounds;
 
     private this(TextureLayer[] layers, uint frameCount)
     {
         this._layers = layers;
         this.frameCount = frameCount;
         this.bounds.toInfinity();
+        this.anchorBounds.toInfinity();
         import std.math : cos, sin;
 
         foreach (frame; 0 .. frameCount)
@@ -64,6 +66,10 @@ class TextureEffect
                         const y = keyFrame.offsetY - 290 +
                             positionX * sine + positionY * cosine;
                         this.bounds.updateBounds(x, y, x, y);
+                        if (frame == 0)
+                        {
+                            this.anchorBounds.updateBounds(x, y, x, y);
+                        }
                     }
                 }
             }
@@ -72,6 +78,10 @@ class TextureEffect
         if (this.bounds.isInfinite)
         {
             this.bounds.updateBounds(0, 0, 1, 1);
+        }
+        if (this.anchorBounds.isInfinite)
+        {
+            this.anchorBounds = this.bounds;
         }
     }
 
@@ -767,6 +777,8 @@ unittest
 
     auto effect = loadTextureEffect("texture/effect/test.str", root);
     assert(effect.frameCount == 1);
+    assert(effect.anchorBounds.x1 == -2 && effect.anchorBounds.y1 == -2);
+    assert(effect.anchorBounds.x2 == 2 && effect.anchorBounds.y2 == 2);
 
     RawImage output = { width: 5, height: 5, pixels: new Color[25] };
     effect.draw(output, 0, 2, 2);
