@@ -431,7 +431,7 @@ private string findTexturePath(string directory, string name)
     }
 
     const wanted = name.toLower;
-    foreach (entry; dirEntries(buildPath(directory, "*"), SpanMode.shallow))
+    foreach (entry; dirEntries(directory, SpanMode.shallow))
     {
         if (baseName(entry.name).toLower == wanted)
         {
@@ -712,7 +712,7 @@ unittest
     strBytes ~= new ubyte[16];
     strBytes.appendLE(2);
 
-    foreach (name; ["fixture.bmp", "fixture.tga"])
+    foreach (name; ["FIXTURE.BMP", "FIXTURE.TGA"])
     {
         strBytes ~= cast(const(ubyte)[]) name;
         strBytes ~= new ubyte[128 - name.length];
