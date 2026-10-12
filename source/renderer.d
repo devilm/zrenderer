@@ -190,6 +190,11 @@ private ulong outputFramesForActor(ulong actorFrames, float interval, ushort out
     return cast(ulong) ceil(actorFrames * 25.0 * interval * outputFrameRate / 1000.0);
 }
 
+private ulong outputFramesForEffect(ulong actorFrames, ulong effectFrames)
+{
+    return actorFrames > effectFrames ? actorFrames : effectFrames;
+}
+
 RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
         sortDelegate sortDg, immutable(Canvas) canvas,
         TextureEffect textureEffect = null, float animationInterval = 4,
@@ -200,6 +205,7 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
 
     Box totalBoundingBox;
     totalBoundingBox.toInfinity();
+    ulong effectFrames;
 
     bool drawSingleFrame = frame < uint.max;
     ulong startframe = drawSingleFrame ? frame : 0;
@@ -220,6 +226,12 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
                 import std.algorithm : max;
 
                 maxframes = max(maxframes, drawobject.children.length);
+            }
+            else
+            {
+                import std.algorithm : max;
+
+                effectFrames = max(effectFrames, drawobject.children.length);
             }
         }
         else
@@ -271,6 +283,11 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
 
             outputFrames = max(outputFrames, textureEffect.frameCount);
         }
+    }
+
+    if (!drawSingleFrame)
+    {
+        outputFrames = outputFramesForEffect(outputFrames, effectFrames);
     }
 
     const totalWidth = canvas != Canvas.init ? canvas.width : totalBoundingBox.width;
@@ -530,4 +547,6 @@ unittest
     assert(actorFrameAt(18, 12, 60) == 1);
     assert(outputFramesForActor(10, 4, 60) == 60);
     assert(outputFramesForActor(5, 12, 60) == 90);
+    assert(outputFramesForEffect(4, 24) == 24);
+    assert(outputFramesForEffect(30, 24) == 30);
 }
