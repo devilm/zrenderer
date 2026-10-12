@@ -78,13 +78,10 @@ private ubyte[] configToByteArray(uint jobid, immutable(Config) config, immutabl
         buffer[(sz * i) .. (sz * (++i))] = config.texture.representation.crc32Of;
     }
 
-    if (config.textureOffsets.length > 0)
+    if (config.texture.length > 0)
     {
-        import std.array : join;
-        import std.digest.crc : crc32Of;
-        import std.string : representation;
-
-        buffer[(sz * i) .. (sz * (++i))] = config.textureOffsets.join(",").representation.crc32Of;
+        buffer[(sz * i) .. (sz * (++i))] = nativeToLittleEndian(config.textureOffsetX);
+        buffer[(sz * i) .. (sz * (++i))] = nativeToLittleEndian(config.textureOffsetY);
     }
 
     return buffer[0 .. (sz * i)];

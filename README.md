@@ -36,7 +36,9 @@ A tool to render sprites from Ragnarok Online
                  --garment Garment which should be attached to the players body. Default: 0
                   --effect Effect folder under data/sprite/이팩트 to render behind the character. Default:
                 --texture STR effect file under data/texture. Use a relative path such as texture/effect/c_released_ground/ki.str. Default:
-                 --weapon Weapon which should be attached to the players body. Default: 0
+        --textureOffsetX Horizontal STR texture offset in pixels; positive values move right. Default: 0
+        --textureOffsetY Vertical STR texture offset in pixels; positive values move down. Default: 0
+                   --weapon Weapon which should be attached to the players body. Default: 0
                   --shield Shield which should be attached to the players body. Default: 0
 -a                --action Action of the job which should be drawn. Default: 0
 -f                 --frame Frame of the action which should be drawn. Set to -1 to draw all frames. Default: -1
@@ -79,10 +81,12 @@ To render a standard effect:
 `./zrenderer --job=1 --effect=c_aura_of_ghost_s`
 
 To render the STR texture effect used by headgear 2136 alongside a character:
-`./zrenderer --job=1 --headgear=2136 --texture="texture\effect\c_released_ground\ki.str"`
+`./zrenderer --job=1 --headgear=2136 --texture="texture\effect\c_released_ground\ki.str" --textureOffsetX=-4 --textureOffsetY=50`
 
 STR textures are composited over the rendered character and animated across the STR's frames.
-The texture path is relative to the configured resource directory's `data` folder.
+The texture path is relative to the configured resource directory's `data` folder. Pass
+`--textureOffsetX` and `--textureOffsetY` to move the texture for this render; positive X moves
+right and positive Y moves down. Both default to `0`.
 
 **Render monster with id 1001 (Scorpion) with action 0 (Stand, default)**  
 `./zrenderer --job=1001`  
@@ -124,6 +128,20 @@ The server will listen on the _hosts_, bind to _port_, write its logs to _logfil
 
 When running the server for the first time and no access token file has been specified the server will automatically generate one
 and print the token to the console. The token is used for protected endpoints; `POST /render` can be called without one. If a valid token is supplied to `/render`, its configured request limits are applied; an absent or invalid token is treated as public access.
+
+The `/render` JSON body accepts `textureOffsetX` and `textureOffsetY` as optional integer fields.
+They apply only to that render request, with omitted values defaulting to the server configuration
+(normally `0`). For example:
+
+```json
+{
+  "job": ["1"],
+  "headgear": [2136],
+  "texture": "texture/effect/c_released_ground/ki.str",
+  "textureOffsetX": -4,
+  "textureOffsetY": 50
+}
+```
 
 You can find the openApi specifications here: [OpenAPI specifications](https://github.com/zhad3/zrenderer/tree/main/server/api-spec).
 

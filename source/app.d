@@ -10,7 +10,6 @@ import sprite;
 import std.zip : ZipArchive;
 import validation;
 import textureeffect : TextureEffect, TextureEffectException, loadTextureEffect;
-import textureoffset : TextureOffsetException, textureOffsetForPath;
 
 void createOutputDirectory(string outputDirectory) @safe
 {
@@ -125,21 +124,11 @@ string[] process(immutable Config config, LogDg log, LuaState L,
     }
 
     TextureEffect textureEffect;
-    int textureOffsetX;
-    int textureOffsetY;
     if (config.texture.length > 0)
     {
         try
         {
-            const textureOffset = textureOffsetForPath(config.texture, config.textureOffsets);
-            textureOffsetX = textureOffset.x;
-            textureOffsetY = textureOffset.y;
             textureEffect = loadTextureEffect(config.texture, config.resourcepath);
-        }
-        catch (TextureOffsetException err)
-        {
-            log(LogLevel.error, "Unable to read texture offsets: " ~ err.msg);
-            return [];
         }
         catch (TextureEffectException err)
         {
@@ -199,9 +188,12 @@ string[] process(immutable Config config, LogDg log, LuaState L,
             if (textureEffect !is null && !config.enableUniqueFilenames)
             {
                 import std.digest.crc : crc32Of, crcHexString;
+                import std.format : format;
                 import std.string : representation;
 
-                outputFilename ~= "_texture-" ~ crcHexString(config.texture.representation.crc32Of);
+                const textureRequest = format("%s:%d:%d", config.texture,
+                        config.textureOffsetX, config.textureOffsetY);
+                outputFilename ~= "_texture-" ~ crcHexString(textureRequest.representation.crc32Of);
             }
 
             if (config.returnExistingFiles && config.outputFormat != OutputFormat.zip)
@@ -293,7 +285,7 @@ string[] process(immutable Config config, LogDg log, LuaState L,
 
             RawImage[] images = drawPlayer(sprites, config.action,
                     (requestFrame < 0) ? uint.max : requestFrame, &sortIndexDelegate, canvas,
-                    textureEffect, animationInterval, textureOffsetX, textureOffsetY);
+                    textureEffect, animationInterval, config.textureOffsetX, config.textureOffsetY);
 
             if (isBaby(jobid))
             {

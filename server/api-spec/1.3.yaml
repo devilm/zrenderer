@@ -372,6 +372,20 @@ components:
           description: Effect folder under data/sprite/이팩트 to render behind the character.
           type: string
           example: c_aura_of_ghost_s
+        texture:
+          description: Relative path to an STR texture effect under the data directory.
+          type: string
+          example: texture/effect/c_released_ground/ki.str
+        textureOffsetX:
+          format: int32
+          description: Horizontal STR texture offset in pixels. Positive values move the texture right.
+          type: integer
+          example: -4
+        textureOffsetY:
+          format: int32
+          description: Vertical STR texture offset in pixels. Positive values move the texture down.
+          type: integer
+          example: 50
         weapon:
           format: int32
           description: Weapon which should be attached to the players body.

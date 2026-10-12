@@ -14,6 +14,8 @@ struct RenderRequestData
     @optional Nullable!uint garment;
     @optional Nullable!string effect;
     @optional Nullable!string texture;
+    @optional Nullable!int textureOffsetX;
+    @optional Nullable!int textureOffsetY;
     @optional Nullable!uint weapon;
     @optional Nullable!uint shield;
     @optional Nullable!int bodyPalette;
@@ -96,6 +98,8 @@ string toString(const scope RenderRequestData data) pure @safe
     if (!data.garment.isNull) putSingle(data.garment.get, "garment");
     if (!data.effect.isNull) putSingle(data.effect.get, "effect");
     if (!data.texture.isNull) putSingle(data.texture.get, "texture");
+    if (!data.textureOffsetX.isNull) putSingle(data.textureOffsetX.get, "textureOffsetX");
+    if (!data.textureOffsetY.isNull) putSingle(data.textureOffsetY.get, "textureOffsetY");
     if (!data.weapon.isNull) putSingle(data.weapon.get, "weapon");
     if (!data.shield.isNull) putSingle(data.shield.get, "shield");
     if (!data.bodyPalette.isNull) putSingle(data.bodyPalette.get, "bodyPalette");
