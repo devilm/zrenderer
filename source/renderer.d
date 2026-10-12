@@ -139,9 +139,31 @@ RawImage[] drawAction(scope Sprite sprite, uint action)
 
 alias sortDelegate = void delegate(ref int[] index, uint frame, ulong maxframes);
 
+private ulong actorFrameAt(ulong outputFrame, float interval, ushort outputFrameRate)
+{
+    if (interval <= 0 || outputFrameRate == 0)
+    {
+        return outputFrame;
+    }
+
+    return cast(ulong) (outputFrame * 1000.0 / (outputFrameRate * 25.0 * interval));
+}
+
+private ulong outputFramesForActor(ulong actorFrames, float interval, ushort outputFrameRate)
+{
+    if (interval <= 0 || outputFrameRate == 0)
+    {
+        return actorFrames;
+    }
+
+    import std.math : ceil;
+
+    return cast(ulong) ceil(actorFrames * 25.0 * interval * outputFrameRate / 1000.0);
+}
+
 RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
         sortDelegate sortDg, immutable(Canvas) canvas,
-        TextureEffect textureEffect = null)
+        TextureEffect textureEffect = null, float animationInterval = 4)
 {
     DrawObject[] drawobjects;
     drawobjects.reserve(sprites.length);
@@ -196,6 +218,13 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
     }
 
     ulong outputFrames = maxframes;
+    if (textureEffect !is null && !drawSingleFrame)
+    {
+        import std.algorithm : max;
+
+        outputFrames = max(outputFrames,
+                outputFramesForActor(maxframes, animationInterval, textureEffect.frameRate));
+    }
     Box textureAnchorBounds;
     textureAnchorBounds.toInfinity();
     foreach (i, sprite; sprites)
@@ -211,11 +240,11 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
         textureAnchorBounds = totalBoundingBox;
     }
     const textureAnchorX = (textureAnchorBounds.x1 + textureAnchorBounds.x2) / 2;
-    const textureAnchorY = textureAnchorBounds.y2;
+    const textureAnchorY = (textureAnchorBounds.y1 + textureAnchorBounds.y2) / 2;
     const texturePositionX = textureEffect is null ? 0 :
-        textureAnchorX - (textureEffect.anchorBounds.x1 + textureEffect.anchorBounds.x2) / 2 - 8;
+        textureAnchorX - (textureEffect.bounds.x1 + textureEffect.bounds.x2) / 2;
     const texturePositionY = textureEffect is null ? 0 :
-        textureAnchorY - (textureEffect.anchorBounds.y1 + textureEffect.anchorBounds.y2) / 2 - 28;
+        textureAnchorY - (textureEffect.bounds.y1 + textureEffect.bounds.y2) / 2;
     if (textureEffect !is null)
     {
         totalBoundingBox.updateBounds(
@@ -257,110 +286,12 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
         outputImage[i - startframe].height = totalHeight;
         outputImage[i - startframe].pixels = new Color[totalWidth * totalHeight];
 
-        sortDg(sortIndex, cast(uint) i, maxframes);
+        const actorFrame = textureEffect is null || drawSingleFrame
+            ? i
+            : actorFrameAt(i, animationInterval, textureEffect.frameRate);
+        sortDg(sortIndex, cast(uint) actorFrame, maxframes);
 
-        bool textureDrawn;
-        for (auto d = 0; d < sortIndex.length; ++d)
-        {
-            import std.conv : to;
-
-            auto drawobject = drawobjects[sortIndex[d]];
-
-            if (!drawSingleFrame && drawobject.children.length == 0)
-            {
-                continue;
-            }
-
-            ulong frameindex = i; // Overwrite frame for shadow and animated headgears
-            uint actionindex = action; // Overwrite action for shadow
-            ulong frameoffset = 0; // Offset for animated headgears
-
-            const sprite = sprites[sortIndex[d]];
-
-            if (!textureDrawn && textureEffect !is null && sprite.zIndex >= 0)
-            {
-                textureEffect.draw(outputImage[i - startframe], cast(uint) i,
-                        cast(int) (-offset.x + texturePositionX),
-                        cast(int) (-offset.y + texturePositionY));
-                textureDrawn = true;
-            }
-
-            const playerAction = intToPlayerAction(action);
-
-            if (sprite.type == SpriteType.shadow)
-            {
-                actionindex = 0;
-                frameindex = 0;
-            }
-            else if (sprite.type == SpriteType.effect)
-            {
-                actionindex = 0;
-                frameindex = cast(uint) (i % sprite.act.frames(0).length);
-            }
-            else if ((sprite.type == SpriteType.playerhead || sprite.type == SpriteType.accessory || sprite.type == SpriteType.garment) &&
-                    (playerAction == PlayerAction.stand || playerAction == PlayerAction.sit))
-            {
-                import config : HeadDirection, toInt;
-
-                if (!drawSingleFrame && maxframes >= 3)
-                {
-                    const frameCountOfCurrentSprite = sprite.act.frames(action).length;
-                    if (sprite.type == SpriteType.garment)
-                    {
-                        frameindex = i % maxframes;
-                    }
-                    else if (sprite.headdir != HeadDirection.all)
-                    {
-                        frameoffset = sprite.headdir.toInt() * frameCountOfCurrentSprite / 3;
-                    }
-                    else if (sprite.type == SpriteType.playerhead)
-                    {
-                        frameindex = i / (maxframes / 3);
-                    }
-                    else if (frameCountOfCurrentSprite >= 3)
-                    {
-                        // Other animated headgears
-                        const bigStep = maxframes / 3;
-                        const smallStep = frameCountOfCurrentSprite / 3;
-                        const index = i / bigStep;
-                        const alignment = smallStep - ((index * bigStep) % smallStep);
-                        frameindex = (i + alignment) % smallStep + index * smallStep;
-                    }
-                }
-                else if (sprite.act.frames(action).length >= 3)
-                {
-                    frameoffset = i * sprite.act.frames(action).length / 3 - frameindex;
-                }
-            }
-
-            if (!drawSingleFrame && frameindex >= drawobject.children.length)
-            {
-                if (drawobject.children.length == 3 && maxframes >= 3)
-                {
-                    frameindex = i / (maxframes / 3) % drawobject.children.length;
-                }
-                else
-                {
-                    frameindex = frameindex % drawobject.children.length;
-                }
-            }
-
-            DrawObject frameobj;
-            if (!drawSingleFrame)
-            {
-                frameobj = drawobject.children[frameindex];
-            }
-            else
-            {
-                frameobj = drawobject;
-            }
-
-            drawFrameOnImage(outputImage[i - startframe], sprites[sortIndex[d]], actionindex,
-                    cast(uint) (frameindex + frameoffset), frameobj, offset);
-
-        }
-
-        if (!textureDrawn && textureEffect !is null)
+        if (textureEffect !is null)
         {
             textureEffect.draw(outputImage[i - startframe], cast(uint) i,
                     cast(int) (-offset.x + texturePositionX),
@@ -391,6 +322,97 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
                     }
                 }
             }
+        }
+
+        for (auto d = 0; d < sortIndex.length; ++d)
+        {
+            import std.conv : to;
+
+            auto drawobject = drawobjects[sortIndex[d]];
+
+            if (!drawSingleFrame && drawobject.children.length == 0)
+            {
+                continue;
+            }
+
+            ulong frameindex = actorFrame; // Overwrite frame for shadow and animated headgears
+            uint actionindex = action; // Overwrite action for shadow
+            ulong frameoffset = 0; // Offset for animated headgears
+
+            const sprite = sprites[sortIndex[d]];
+
+            const playerAction = intToPlayerAction(action);
+
+            if (sprite.type == SpriteType.shadow)
+            {
+                actionindex = 0;
+                frameindex = 0;
+            }
+            else if (sprite.type == SpriteType.effect)
+            {
+                actionindex = 0;
+                frameindex = cast(uint) (actorFrame % sprite.act.frames(0).length);
+            }
+            else if ((sprite.type == SpriteType.playerhead || sprite.type == SpriteType.accessory || sprite.type == SpriteType.garment) &&
+                    (playerAction == PlayerAction.stand || playerAction == PlayerAction.sit))
+            {
+                import config : HeadDirection, toInt;
+
+                if (!drawSingleFrame && maxframes >= 3)
+                {
+                    const frameCountOfCurrentSprite = sprite.act.frames(action).length;
+                    if (sprite.type == SpriteType.garment)
+                    {
+                        frameindex = actorFrame % maxframes;
+                    }
+                    else if (sprite.headdir != HeadDirection.all)
+                    {
+                        frameoffset = sprite.headdir.toInt() * frameCountOfCurrentSprite / 3;
+                    }
+                    else if (sprite.type == SpriteType.playerhead)
+                    {
+                        frameindex = actorFrame / (maxframes / 3);
+                    }
+                    else if (frameCountOfCurrentSprite >= 3)
+                    {
+                        // Other animated headgears
+                        const bigStep = maxframes / 3;
+                        const smallStep = frameCountOfCurrentSprite / 3;
+                        const index = actorFrame / bigStep;
+                        const alignment = smallStep - ((index * bigStep) % smallStep);
+                        frameindex = (actorFrame + alignment) % smallStep + index * smallStep;
+                    }
+                }
+                else if (sprite.act.frames(action).length >= 3)
+                {
+                    frameoffset = actorFrame * sprite.act.frames(action).length / 3 - frameindex;
+                }
+            }
+
+            if (!drawSingleFrame && frameindex >= drawobject.children.length)
+            {
+                if (drawobject.children.length == 3 && maxframes >= 3)
+                {
+                    frameindex = actorFrame / (maxframes / 3) % drawobject.children.length;
+                }
+                else
+                {
+                    frameindex = frameindex % drawobject.children.length;
+                }
+            }
+
+            DrawObject frameobj;
+            if (!drawSingleFrame)
+            {
+                frameobj = drawobject.children[frameindex];
+            }
+            else
+            {
+                frameobj = drawobject;
+            }
+
+            drawFrameOnImage(outputImage[i - startframe], sprites[sortIndex[d]], actionindex,
+                    cast(uint) (frameindex + frameoffset), frameobj, offset);
         }
     }
 
@@ -471,4 +493,13 @@ RawImage[] applyBabyScaling(return ref RawImage[] images, float scaleFactor)
     }
 
     return images;
+}
+
+unittest
+{
+    assert(actorFrameAt(5, 4, 60) == 0);
+    assert(actorFrameAt(6, 4, 60) == 1);
+    assert(actorFrameAt(18, 12, 60) == 1);
+    assert(outputFramesForActor(10, 4, 60) == 60);
+    assert(outputFramesForActor(5, 12, 60) == 90);
 }

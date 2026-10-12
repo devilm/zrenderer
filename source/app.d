@@ -287,7 +287,7 @@ string[] process(immutable Config config, LogDg log, LuaState L,
 
             RawImage[] images = drawPlayer(sprites, config.action,
                     (requestFrame < 0) ? uint.max : requestFrame, &sortIndexDelegate, canvas,
-                    textureEffect);
+                    textureEffect, animationInterval);
 
             if (isBaby(jobid))
             {
@@ -302,7 +302,8 @@ string[] process(immutable Config config, LogDg log, LuaState L,
                 import filehelper : storeImages;
 
                 auto fnames = storeImages(images, requestFrame, config, outputFilename, zipFilename, log,
-                        animationInterval, archive);
+                        animationInterval, archive,
+                        textureEffect is null ? 0 : textureEffect.frameRate);
 
                 if (config.outputFormat != OutputFormat.zip)
                 {

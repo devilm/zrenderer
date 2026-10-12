@@ -20,6 +20,10 @@ private struct TextureKeyFrame
     float[8] uvs;
     float[8] positions;
     float textureIndex;
+    int animationType;
+    float animationDelay;
+    int blendSource;
+    int blendDestination;
     float angle;
     float[4] color;
 }
@@ -35,16 +39,16 @@ class TextureEffect
 {
     private TextureLayer[] _layers;
 
+    ushort frameRate;
     uint frameCount;
     Box bounds;
-    Box anchorBounds;
 
-    private this(TextureLayer[] layers, uint frameCount)
+    private this(TextureLayer[] layers, uint frameCount, ushort frameRate)
     {
         this._layers = layers;
         this.frameCount = frameCount;
+        this.frameRate = frameRate;
         this.bounds.toInfinity();
-        this.anchorBounds.toInfinity();
         import std.math : cos, sin;
 
         foreach (frame; 0 .. frameCount)
@@ -52,7 +56,8 @@ class TextureEffect
             foreach (layer; this._layers)
             {
                 TextureKeyFrame keyFrame;
-                if (interpolatedKeyFrame(layer.keyFrames, cast(int) frame, keyFrame))
+                if (keyFrameAt(layer.keyFrames, cast(int) frame,
+                        cast(uint) layer.textureNames.length, keyFrame))
                 {
                     const angle = keyFrame.angle * (3.14159265358979323846f / 180f);
                     const cosine = cos(angle);
@@ -66,10 +71,6 @@ class TextureEffect
                         const y = keyFrame.offsetY - 290 +
                             positionX * sine + positionY * cosine;
                         this.bounds.updateBounds(x, y, x, y);
-                        if (frame == 0)
-                        {
-                            this.anchorBounds.updateBounds(x, y, x, y);
-                        }
                     }
                 }
             }
@@ -79,10 +80,6 @@ class TextureEffect
         {
             this.bounds.updateBounds(0, 0, 1, 1);
         }
-        if (this.anchorBounds.isInfinite)
-        {
-            this.anchorBounds = this.bounds;
-        }
     }
 
     void draw(ref RawImage destination, uint frame, int offsetX, int offsetY) const
@@ -90,8 +87,8 @@ class TextureEffect
         foreach (layer; this._layers)
         {
             TextureKeyFrame keyFrame;
-            if (!interpolatedKeyFrame(layer.keyFrames,
-                    cast(int) (frame % this.frameCount), keyFrame))
+            if (!keyFrameAt(layer.keyFrames, cast(int) (frame % this.frameCount),
+                    cast(uint) layer.textureNames.length, keyFrame))
             {
                 continue;
             }
@@ -141,8 +138,10 @@ class TextureEffect
                 keyFrame.uvs[1] + keyFrame.uvs[3]
             ];
 
-            drawTriangle(destination, texture, x, y, u, v, [0, 1, 2], keyFrame.color);
-            drawTriangle(destination, texture, x, y, u, v, [0, 2, 3], keyFrame.color);
+            drawTriangle(destination, texture, x, y, u, v, [0, 1, 2], keyFrame.color,
+                    keyFrame.blendSource, keyFrame.blendDestination);
+            drawTriangle(destination, texture, x, y, u, v, [0, 2, 3], keyFrame.color,
+                    keyFrame.blendSource, keyFrame.blendDestination);
         }
     }
 }
@@ -155,13 +154,8 @@ TextureEffect loadTextureEffect(string relativePath, string resourcePath)
     import std.bitmanip : peek;
     import std.system : Endian;
 
-    string normalizedPath;
-    foreach (character; relativePath)
-    {
-        normalizedPath ~= character == '\\' ? '/' : character;
-    }
-
-    const strPath = buildPath(resourcePath, "data", normalizedPath);
+    const strPath = buildPath(normalizeSeparators(resourcePath), "data",
+            normalizeSeparators(relativePath));
     const strBytes = cast(const(ubyte)[]) read(strPath);
     size_t cursor;
 
@@ -185,7 +179,7 @@ TextureEffect loadTextureEffect(string relativePath, string resourcePath)
     const layerCount = peek!(int, Endian.littleEndian)(strBytes, cursor);
     cursor += int.sizeof + 16;
 
-    if (fps <= 0 || layerCount < 0 || layerCount > 256)
+    if (fps <= 0 || fps > ushort.max || layerCount < 0 || layerCount > 256)
     {
         throw new TextureEffectException("Invalid STR header values: " ~ strPath);
     }
@@ -228,15 +222,15 @@ TextureEffect loadTextureEffect(string relativePath, string resourcePath)
                 value = readFloat(strBytes, cursor);
             }
             keyFrame.textureIndex = readFloat(strBytes, cursor);
-            readInt(strBytes, cursor); // Animation type
-            readFloat(strBytes, cursor); // Delay
+            keyFrame.animationType = readInt(strBytes, cursor);
+            keyFrame.animationDelay = readFloat(strBytes, cursor);
             keyFrame.angle = readFloat(strBytes, cursor) * (360f / 1024f);
             foreach (ref value; keyFrame.color)
             {
                 value = readFloat(strBytes, cursor);
             }
-            readInt(strBytes, cursor); // Blend source
-            readInt(strBytes, cursor); // Blend destination
+            keyFrame.blendSource = readInt(strBytes, cursor);
+            keyFrame.blendDestination = readInt(strBytes, cursor);
             readInt(strBytes, cursor); // Multi-texture flag
 
             if (keyFrame.frameIndex < 0 || keyFrame.type < 0 || keyFrame.type > 1)
@@ -252,16 +246,68 @@ TextureEffect loadTextureEffect(string relativePath, string resourcePath)
             }
         }
 
-        foreach (name; layer.textureNames)
+        bool[] usedTextures = new bool[layer.textureNames.length];
+        int layerMaxFrame;
+        foreach (keyFrame; layer.keyFrames)
         {
-            if (name.length == 0)
+            if (keyFrame.type == 0 && keyFrame.frameIndex > layerMaxFrame)
             {
-                layer.textures ~= RawImage.init;
+                layerMaxFrame = keyFrame.frameIndex;
+            }
+        }
+
+        foreach (keyIndex, keyFrame; layer.keyFrames)
+        {
+            if (keyFrame.type != 0)
+            {
+                continue;
+            }
+
+            int endFrame = layerMaxFrame;
+            foreach (nextKey; layer.keyFrames[keyIndex + 1 .. $])
+            {
+                if (nextKey.type == 0)
+                {
+                    endFrame = nextKey.frameIndex;
+                    break;
+                }
+            }
+
+            const hasTween = keyIndex + 1 < layer.keyFrames.length &&
+                layer.keyFrames[keyIndex + 1].type == 1 &&
+                layer.keyFrames[keyIndex + 1].frameIndex == keyFrame.frameIndex;
+            if (!hasTween)
+            {
+                const textureIndex = cast(int) keyFrame.textureIndex;
+                if (textureIndex >= 0 && cast(size_t) textureIndex < usedTextures.length)
+                {
+                    usedTextures[textureIndex] = true;
+                }
+                continue;
+            }
+
+            const tween = layer.keyFrames[keyIndex + 1];
+            foreach (elapsed; 0 .. endFrame - keyFrame.frameIndex)
+            {
+                const textureIndex = animatedTextureIndex(keyFrame, tween, elapsed,
+                        cast(uint) layer.textureNames.length);
+                if (textureIndex >= 0 && cast(size_t) textureIndex < usedTextures.length)
+                {
+                    usedTextures[textureIndex] = true;
+                }
+            }
+        }
+
+        layer.textures.length = layer.textureNames.length;
+        foreach (index, name; layer.textureNames)
+        {
+            if (!usedTextures[index] || name.length == 0)
+            {
                 continue;
             }
 
             const texturePath = findTexturePath(dirName(strPath), name);
-            layer.textures ~= readTexture(texturePath);
+            layer.textures[index] = readTexture(texturePath);
         }
     }
 
@@ -280,7 +326,20 @@ TextureEffect loadTextureEffect(string relativePath, string resourcePath)
         throw new TextureEffectException("Invalid STR frame count: " ~ strPath);
     }
 
-    return new TextureEffect(layers, cast(uint) maxKeyFrame + 1);
+    return new TextureEffect(layers, cast(uint) maxKeyFrame + 1, cast(ushort) fps);
+}
+
+private string normalizeSeparators(string path)
+{
+    import std.path : dirSeparator;
+
+    string normalized;
+    const separator = dirSeparator[0];
+    foreach (character; path)
+    {
+        normalized ~= character == '/' || character == '\\' ? separator : character;
+    }
+    return normalized;
 }
 
 private int readInt(const(ubyte)[] bytes, ref size_t cursor)
@@ -327,83 +386,131 @@ private void ensureAvailable(const(ubyte)[] bytes, size_t cursor, size_t length)
     }
 }
 
-private bool interpolatedKeyFrame(const(TextureKeyFrame)[] frames, int frame,
+private bool keyFrameAt(const(TextureKeyFrame)[] frames, int frame, uint textureCount,
         out TextureKeyFrame output)
 {
-    ptrdiff_t previous = -1;
-    ptrdiff_t next = -1;
-
+    ptrdiff_t baseIndex = -1;
     foreach (i, keyFrame; frames)
     {
-        if (keyFrame.type != 0)
+        if (keyFrame.type == 0 && keyFrame.frameIndex <= frame)
         {
-            continue;
-        }
-        if (keyFrame.frameIndex <= frame)
-        {
-            previous = cast(ptrdiff_t) i;
-        }
-        else
-        {
-            next = cast(ptrdiff_t) i;
-            break;
+            baseIndex = cast(ptrdiff_t) i;
         }
     }
 
-    if (previous < 0)
+    if (baseIndex < 0)
     {
         return false;
     }
 
-    output = frames[previous];
-    if (next < 0)
+    const base = frames[baseIndex];
+    output = base;
+    if (baseIndex + 1 >= frames.length)
     {
         return true;
     }
 
-    const start = frames[previous];
-    const end = frames[next];
-    const span = end.frameIndex - start.frameIndex;
-    if (span <= 0)
+    const tween = frames[baseIndex + 1];
+    if (tween.type != 1 || tween.frameIndex != base.frameIndex)
     {
         return true;
     }
 
-    bool interpolate;
-    foreach (keyFrame; frames)
+    const elapsed = frame - base.frameIndex;
+    output.offsetX += tween.offsetX * elapsed;
+    output.offsetY += tween.offsetY * elapsed;
+    output.angle += tween.angle * elapsed;
+    foreach (index; 0 .. output.uvs.length)
     {
-        if (keyFrame.frameIndex == start.frameIndex && keyFrame.type == 1)
-        {
-            interpolate = true;
-            break;
-        }
+        output.uvs[index] += tween.uvs[index] * elapsed;
+        output.positions[index] += tween.positions[index] * elapsed;
     }
-    if (!interpolate)
+    foreach (index; 0 .. output.color.length)
     {
-        return true;
+        output.color[index] += tween.color[index] * elapsed;
     }
-
-    const progress = cast(float) (frame - start.frameIndex) / span;
-    output.offsetX = mix(start.offsetX, end.offsetX, progress);
-    output.offsetY = mix(start.offsetY, end.offsetY, progress);
-    output.angle = mix(start.angle, end.angle, progress);
-    output.textureIndex = start.textureIndex;
-    foreach (i; 0 .. 8)
-    {
-        output.uvs[i] = mix(start.uvs[i], end.uvs[i], progress);
-        output.positions[i] = mix(start.positions[i], end.positions[i], progress);
-    }
-    foreach (i; 0 .. 4)
-    {
-        output.color[i] = mix(start.color[i], end.color[i], progress);
-    }
-
+    output.textureIndex = animatedTextureIndex(base, tween, elapsed, textureCount);
     return true;
 }
 
-private float mix(float a, float b, float progress) pure nothrow @safe @nogc
+private int animatedTextureIndex(const ref TextureKeyFrame base,
+        const ref TextureKeyFrame tween, int elapsed, uint textureCount)
 {
-    return a + (b - a) * progress;
+    import std.algorithm : min;
+    import std.math : floor;
+
+    if (textureCount == 0)
+    {
+        return -1;
+    }
+
+    float index = base.textureIndex;
+    switch (tween.animationType)
+    {
+        case 0:
+            break;
+        case 1:
+            index += tween.textureIndex * elapsed;
+            break;
+        case 2:
+            index = min(index + tween.animationDelay * elapsed, textureCount - 1);
+            break;
+        case 3:
+            index += tween.animationDelay * elapsed;
+            break;
+        case 4:
+            index -= tween.animationDelay * elapsed;
+            break;
+        default:
+            break;
+    }
+
+    auto result = cast(int) floor(index);
+    if (tween.animationType == 3 || tween.animationType == 4)
+    {
+        result %= cast(int) textureCount;
+        if (result < 0)
+        {
+            result += textureCount;
+        }
+    }
+    return result;
+}
+
+unittest
+{
+    TextureKeyFrame base;
+    base.offsetX = 0f;
+    base.offsetY = 0f;
+    base.uvs[] = 0f;
+    base.positions[] = 0f;
+    base.textureIndex = 0;
+    base.angle = 0f;
+    base.color[] = 0f;
+    TextureKeyFrame tween;
+    tween.offsetX = 0f;
+    tween.offsetY = 0f;
+    tween.uvs[] = 0f;
+    tween.positions[] = 0f;
+    tween.color[] = 0f;
+    tween.textureIndex = 0f;
+    tween.type = 1;
+    tween.animationType = 3;
+    tween.animationDelay = 0.5f;
+    tween.angle = 2f;
+    tween.positions[0] = 1f;
+
+    const frames = [base, tween];
+    TextureKeyFrame evaluated;
+
+    assert(keyFrameAt(frames, 2, 2, evaluated));
+    assert(evaluated.textureIndex == 1);
+    assert(evaluated.angle > 3.99f && evaluated.angle < 4.01f);
+    assert(evaluated.positions[0] == 2f);
+
+    tween.animationType = 4;
+    tween.animationDelay = 1f;
+    assert(animatedTextureIndex(base, tween, 1, 2) == 1);
 }
 
 private string findTexturePath(string directory, string name)
@@ -599,7 +706,7 @@ private Color makeColor(ubyte red, ubyte green, ubyte blue, ubyte alpha) pure no
 
 private void drawTriangle(ref RawImage destination, const RawImage texture,
         const float[4] x, const float[4] y, const float[4] u, const float[4] v,
-        const int[3] corners, const float[4] tint)
+        const int[3] corners, const float[4] tint, int blendSource, int blendDestination)
 {
     import std.algorithm : max, min;
     import std.math : ceil, floor;
@@ -649,7 +756,8 @@ private void drawTriangle(ref RawImage destination, const RawImage texture,
             source.b = cast(ubyte) min(255f, source.b * clamp(tint[2], 0, 255) / 255f);
             source.a = cast(ubyte) min(255f, source.a * clamp(tint[3], 0, 255) / 255f);
             const destIndex = cast(size_t) pixelY * destination.width + pixelX;
-            destination.pixels[destIndex] = blend(destination.pixels[destIndex], source);
+            destination.pixels[destIndex] = blend(destination.pixels[destIndex], source,
+                    blendSource == 5 && blendDestination == 7);
         }
     }
 }
@@ -659,11 +767,31 @@ private float clamp(float value, float lower, float upper) pure nothrow @safe @n
     return value < lower ? lower : value > upper ? upper : value;
 }
 
-private Color blend(Color destination, Color source) pure nothrow @safe @nogc
+private Color blend(Color destination, Color source, bool additive = false) pure nothrow @safe @nogc
 {
+    import std.algorithm : min;
+
     if (source.a == 0)
     {
         return destination;
+    }
+    if (additive)
+    {
+        const alpha = source.a + destination.a * (255 - source.a) / 255;
+        if (alpha == 0)
+        {
+            return Color.init;
+        }
+
+        Color result;
+        result.r = cast(ubyte) min(255, (source.r * source.a +
+                destination.r * destination.a) / alpha);
+        result.g = cast(ubyte) min(255, (source.g * source.a +
+                destination.g * destination.a) / alpha);
+        result.b = cast(ubyte) min(255, (source.b * source.a +
+                destination.b * destination.a) / alpha);
+        result.a = cast(ubyte) alpha;
+        return result;
     }
     if (destination.a == 0 || source.a == 255)
     {
@@ -682,6 +810,18 @@ private Color blend(Color destination, Color source) pure nothrow @safe @nogc
     return result;
 }
 
+unittest
+{
+    const destination = Color(0xFF646464);
+    const source = Color(0x80646464);
+    const normal = blend(destination, source);
+    const additive = blend(destination, source, true);
+
+    assert(normal.r == 100);
+    assert(additive.r == 150);
+    assert(additive.a == 255);
+}
+
 private void appendLE(T)(ref ubyte[] bytes, T value)
 {
     import std.bitmanip : nativeToLittleEndian;
@@ -693,7 +833,7 @@ private void appendLE(T)(ref ubyte[] bytes, T value)
 unittest
 {
     import std.file : mkdirRecurse, rmdirRecurse, tempDir, write;
-    import std.path : buildPath;
+    import std.path : buildPath, dirSeparator;
     import std.uuid : randomUUID;
 
     const root = buildPath(tempDir(), "zrenderer-str-test-" ~ randomUUID.toString);
@@ -707,42 +847,45 @@ unittest
     ubyte[] strBytes = cast(ubyte[]) "STRM".dup;
     strBytes ~= [cast(ubyte) 148, 0, 0, 0];
     strBytes.appendLE(60);
-    strBytes.appendLE(0);
+    strBytes.appendLE(1);
     strBytes.appendLE(1);
     strBytes ~= new ubyte[16];
-    strBytes.appendLE(2);
+    strBytes.appendLE(3);
 
-    foreach (name; ["FIXTURE.BMP", "FIXTURE.TGA"])
+    foreach (name; ["MISSING.BMP", "FIXTURE.BMP", "FIXTURE.TGA"])
     {
         strBytes ~= cast(const(ubyte)[]) name;
         strBytes ~= new ubyte[128 - name.length];
     }
 
-    strBytes.appendLE(1);
-    strBytes.appendLE(0);
-    strBytes.appendLE(0);
-    strBytes.appendLE(320f);
-    strBytes.appendLE(290f);
-    foreach (value; [0f, 0f, 1f, 1f, 0f, 0f, 1f, 1f])
+    strBytes.appendLE(2);
+    foreach (frame, textureIndex; [1f, 2f])
     {
-        strBytes.appendLE(value);
-    }
-    foreach (value; [-2f, 2f, 2f, -2f, -2f, -2f, 2f, 2f])
-    {
-        strBytes.appendLE(value);
-    }
-    strBytes.appendLE(1f);
-    strBytes.appendLE(0);
-    strBytes.appendLE(0f);
-    strBytes.appendLE(0f);
-    foreach (_; 0 .. 3)
-    {
+        strBytes.appendLE(cast(int) frame);
+        strBytes.appendLE(0);
+        strBytes.appendLE(320f);
+        strBytes.appendLE(290f);
+        foreach (value; [0f, 0f, 1f, 1f, 0f, 0f, 1f, 1f])
+        {
+            strBytes.appendLE(value);
+        }
+        foreach (value; [-2f, 2f, 2f, -2f, -2f, -2f, 2f, 2f])
+        {
+            strBytes.appendLE(value);
+        }
+        strBytes.appendLE(textureIndex);
+        strBytes.appendLE(0);
+        strBytes.appendLE(0f);
+        strBytes.appendLE(0f);
+        foreach (_; 0 .. 3)
+        {
+            strBytes.appendLE(255f);
+        }
         strBytes.appendLE(255f);
+        strBytes.appendLE(5);
+        strBytes.appendLE(7);
+        strBytes.appendLE(0);
     }
-    strBytes.appendLE(255f);
-    strBytes.appendLE(5);
-    strBytes.appendLE(7);
-    strBytes.appendLE(0);
     write(buildPath(effectDirectory, "test.str"), strBytes);
 
     ubyte[] bmpBytes = cast(ubyte[]) "BM".dup;
@@ -775,13 +918,25 @@ unittest
     tgaBytes[21] = 255;
     write(buildPath(effectDirectory, "fixture.tga"), tgaBytes[]);
 
-    auto effect = loadTextureEffect("texture/effect/test.str", root);
-    assert(effect.frameCount == 1);
-    assert(effect.anchorBounds.x1 == -2 && effect.anchorBounds.y1 == -2);
-    assert(effect.anchorBounds.x2 == 2 && effect.anchorBounds.y2 == 2);
+    string mixedRoot;
+    const separator = dirSeparator[0];
+    foreach (character; root)
+    {
+        mixedRoot ~= character == separator ? (separator == '\\' ? '/' : '\\') : character;
+    }
+    auto effect = loadTextureEffect("texture\\effect\\test.str", mixedRoot);
+    assert(effect.frameCount == 2);
+    assert(effect.frameRate == 60);
+    assert(effect.bounds.x1 == -2 && effect.bounds.y1 == -2);
+    assert(effect.bounds.x2 == 2 && effect.bounds.y2 == 2);
 
     RawImage output = { width: 5, height: 5, pixels: new Color[25] };
     effect.draw(output, 0, 2, 2);
+    assert(output.pixels[12].a > 0);
+    assert(output.pixels[12].r > 100);
+
+    output.pixels[] = Color.init;
+    effect.draw(output, 1, 2, 2);
     assert(output.pixels[12].a > 0);
     assert(output.pixels[12].r > 100);
 }
