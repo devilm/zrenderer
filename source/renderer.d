@@ -163,7 +163,8 @@ private ulong outputFramesForActor(ulong actorFrames, float interval, ushort out
 
 RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
         sortDelegate sortDg, immutable(Canvas) canvas,
-        TextureEffect textureEffect = null, float animationInterval = 4)
+        TextureEffect textureEffect = null, float animationInterval = 4,
+        int textureOffsetX = 0, int textureOffsetY = 0)
 {
     DrawObject[] drawobjects;
     drawobjects.reserve(sprites.length);
@@ -225,27 +226,8 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
         outputFrames = max(outputFrames,
                 outputFramesForActor(maxframes, animationInterval, textureEffect.frameRate));
     }
-    Box textureAnchorBounds;
-    textureAnchorBounds.toInfinity();
-    foreach (i, sprite; sprites)
-    {
-        if (sprite.type == SpriteType.playerbody)
-        {
-            textureAnchorBounds = drawobjects[i].boundingBox;
-            break;
-        }
-    }
-    if (textureAnchorBounds.isInfinite)
-    {
-        textureAnchorBounds = totalBoundingBox;
-    }
-    const textureAnchorX = (textureAnchorBounds.x1 + textureAnchorBounds.x2) / 2 - 4;
-    const textureAnchorY = textureAnchorBounds.y1 +
-        (textureAnchorBounds.y2 - textureAnchorBounds.y1) / 3;
-    const texturePositionX = textureEffect is null ? 0 :
-        textureAnchorX - (textureEffect.bounds.x1 + textureEffect.bounds.x2) / 2;
-    const texturePositionY = textureEffect is null ? 0 :
-        textureAnchorY - (textureEffect.bounds.y1 + textureEffect.bounds.y2) / 2;
+    const texturePositionX = textureEffect is null ? 0 : textureOffsetX;
+    const texturePositionY = textureEffect is null ? 0 : textureOffsetY;
     if (textureEffect !is null)
     {
         totalBoundingBox.updateBounds(

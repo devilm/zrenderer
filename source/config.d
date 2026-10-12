@@ -139,6 +139,10 @@ struct Config
     @Desc("STR texture effect path relative to the data directory, e.g. texture/effect/c_released_ground/ki.str.")
     string texture = "";
 
+    @Desc("Per-effect-folder STR offsets as comma-separated entries in the form folder=x:y. " ~
+            "The folder is the STR file's parent directory; unlisted folders use the STR's native position.")
+    string[] textureOffsets;
+
     @Desc("Weapon which should be attached to the players body.")
     uint weapon;
 
