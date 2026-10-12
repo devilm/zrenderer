@@ -265,21 +265,16 @@ string[] process(immutable Config config, LogDg log, LuaState L,
             import draw : RawImage;
             import renderer : drawPlayer;
 
-            void sortIndexDelegate(ref int[] index, uint frame, ulong maxframes)
+            void sortIndexDelegate(ref int[] index, uint frame, uint garmentFrame)
             {
                 int direction = config.action % 8;
-                const playerAction = intToPlayerAction(config.action);
-                if (maxframes > 3 && (playerAction == PlayerAction.stand || playerAction == PlayerAction.sit))
-                {
-                    frame = frame / (maxframes - 1);
-                }
 
                 foreach (sprite; sprites)
                 {
                     if (sprite.type == SpriteType.garment)
                     {
                         sprite.zIndex = zIndexForGarmentSprite(jobid, config.garment, config.action,
-                                frame, config.gender, direction, L);
+                                garmentFrame, config.gender, direction, L);
                     }
                     else if (sprite.type == SpriteType.playerhead && bodyImf !is null)
                     {

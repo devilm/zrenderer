@@ -137,7 +137,36 @@ RawImage[] drawAction(scope Sprite sprite, uint action)
     return outputImage;
 }
 
-alias sortDelegate = void delegate(ref int[] index, uint frame, ulong maxframes);
+alias sortDelegate = void delegate(ref int[] index, uint frame, uint garmentFrame);
+
+private uint garmentFrameAt(ulong actorFrame, ulong maxframes, ulong garmentFrames,
+        bool cycleStandFrames)
+{
+    if (garmentFrames == 0)
+    {
+        return 0;
+    }
+
+    ulong frameIndex = actorFrame;
+    if (cycleStandFrames && maxframes >= 3)
+    {
+        frameIndex %= maxframes;
+    }
+
+    if (frameIndex >= garmentFrames)
+    {
+        if (garmentFrames == 3 && maxframes >= 3)
+        {
+            frameIndex = actorFrame / (maxframes / 3) % garmentFrames;
+        }
+        else
+        {
+            frameIndex %= garmentFrames;
+        }
+    }
+
+    return cast(uint) frameIndex;
+}
 
 private ulong actorFrameAt(ulong outputFrame, float interval, ushort outputFrameRate)
 {
@@ -262,6 +291,7 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
     import std.algorithm.sorting : makeIndex;
 
     int[] sortIndex = new int[sprites.length];
+    const playerAction = intToPlayerAction(action);
 
     for (auto i = startframe; i < outputFrames; ++i)
     {
@@ -272,7 +302,20 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
         const actorFrame = textureEffect is null || drawSingleFrame
             ? i
             : actorFrameAt(i, animationInterval, textureEffect.frameRate);
-        sortDg(sortIndex, cast(uint) actorFrame, maxframes);
+        uint selectedGarmentFrame = cast(uint) actorFrame;
+        foreach (spriteIndex, sprite; sprites)
+        {
+            if (sprite.type == SpriteType.garment)
+            {
+                selectedGarmentFrame = drawSingleFrame
+                    ? cast(uint) actorFrame
+                    : garmentFrameAt(actorFrame, maxframes,
+                        drawobjects[spriteIndex].children.length,
+                        (playerAction == PlayerAction.stand || playerAction == PlayerAction.sit));
+                break;
+            }
+        }
+        sortDg(sortIndex, cast(uint) actorFrame, selectedGarmentFrame);
 
         if (textureEffect !is null)
         {
@@ -324,8 +367,6 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
 
             const sprite = sprites[sortIndex[d]];
 
-            const playerAction = intToPlayerAction(action);
-
             if (sprite.type == SpriteType.shadow)
             {
                 actionindex = 0;
@@ -336,7 +377,14 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
                 actionindex = 0;
                 frameindex = cast(uint) (actorFrame % sprite.act.frames(0).length);
             }
-            else if ((sprite.type == SpriteType.playerhead || sprite.type == SpriteType.accessory || sprite.type == SpriteType.garment) &&
+            else if (sprite.type == SpriteType.garment)
+            {
+                frameindex = drawSingleFrame
+                    ? cast(uint) actorFrame
+                    : garmentFrameAt(actorFrame, maxframes, drawobject.children.length,
+                        (playerAction == PlayerAction.stand || playerAction == PlayerAction.sit));
+            }
+            else if ((sprite.type == SpriteType.playerhead || sprite.type == SpriteType.accessory) &&
                     (playerAction == PlayerAction.stand || playerAction == PlayerAction.sit))
             {
                 import config : HeadDirection, toInt;
@@ -344,11 +392,7 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
                 if (!drawSingleFrame && maxframes >= 3)
                 {
                     const frameCountOfCurrentSprite = sprite.act.frames(action).length;
-                    if (sprite.type == SpriteType.garment)
-                    {
-                        frameindex = actorFrame % maxframes;
-                    }
-                    else if (sprite.headdir != HeadDirection.all)
+                    if (sprite.headdir != HeadDirection.all)
                     {
                         frameoffset = sprite.headdir.toInt() * frameCountOfCurrentSprite / 3;
                     }
@@ -374,11 +418,7 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
 
             if (!drawSingleFrame && frameindex >= drawobject.children.length)
             {
-                if (drawobject.children.length == 3 && maxframes >= 3)
-                {
-                    frameindex = actorFrame / (maxframes / 3) % drawobject.children.length;
-                }
-                else
+                if (sprite.type != SpriteType.garment)
                 {
                     frameindex = frameindex % drawobject.children.length;
                 }
@@ -480,6 +520,11 @@ RawImage[] applyBabyScaling(return ref RawImage[] images, float scaleFactor)
 
 unittest
 {
+    assert(garmentFrameAt(10, 6, 6, true) == 4);
+    assert(garmentFrameAt(10, 6, 3, true) == 2);
+    assert(garmentFrameAt(10, 6, 2, true) == 0);
+    assert(garmentFrameAt(10, 6, 3, false) == 2);
+    assert(garmentFrameAt(10, 6, 0, true) == 0);
     assert(actorFrameAt(5, 4, 60) == 0);
     assert(actorFrameAt(6, 4, 60) == 1);
     assert(actorFrameAt(18, 12, 60) == 1);
