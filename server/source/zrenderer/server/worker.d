@@ -12,6 +12,18 @@ import luamanager : loadRequiredLuaFiles;
 import luad.state : LuaState;
 import logging : LogDg;
 
+struct RenderWorkerRequest
+{
+    immutable Config config;
+    bool encodeResponse;
+}
+
+struct RenderWorkerResult
+{
+    immutable(string)[] output;
+    immutable(ubyte)[] body;
+}
+
 /// Throws ResourceException
 static ResourceManager createAndInitResourceManager(LuaState L, string resourcePath, LogDg log)
 {
@@ -61,7 +73,8 @@ static void renderWorker(Task caller) nothrow
 
         import vibe.core.concurrency : receiveOnly;
 
-        immutable config = receiveOnly!(immutable Config)();
+        auto request = receiveOnly!RenderWorkerRequest();
+        immutable config = request.config;
 
         if (!isInitialized)
         {
@@ -73,9 +86,11 @@ static void renderWorker(Task caller) nothrow
         }
 
         import app : run;
-        immutable(string)[] filenames = cast(immutable(string)[]) run(config, &logger, L, resManager, resolver);
+        ubyte[] body;
+        immutable(string)[] filenames = cast(immutable(string)[]) run(config, &logger, L,
+                resManager, resolver, request.encodeResponse ? &body : null);
 
-        send(caller, filenames);
+        send(caller, RenderWorkerResult(filenames, cast(immutable(ubyte)[]) body));
     }
     catch (Throwable e)
     {

@@ -86,7 +86,9 @@ To render the STR texture effect used by headgear 2136 alongside a character:
 STR textures are composited over the rendered character and animated across the STR's frames.
 The texture path is relative to the configured resource directory's `data` folder. Pass
 `--textureOffsetX` and `--textureOffsetY` to move the texture for this render; positive X moves
-right and positive Y moves down. Both default to `0`.
+right and positive Y moves down. Both default to `0`. Referenced BMP textures may use
+uncompressed 8-bit indexed, 24-bit, or 32-bit pixels. For BMPs without an alpha channel,
+black-background color intensity is converted to opacity so dark edge pixels remain translucent.
 
 **Render monster with id 1001 (Scorpion) with action 0 (Stand, default)**  
 `./zrenderer --job=1001`  

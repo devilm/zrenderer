@@ -40,7 +40,7 @@ paths:
       parameters:
         - deprecated: false
           name: downloadimage
-          description: If provided, the request will return the first rendered image.
+          description: If provided, the request will return the first rendered image, encoded in memory without creating an image file on disk.
           schema:
             type: boolean
           in: query
@@ -56,13 +56,13 @@ paths:
             image/png:
               schema:
                 format: binary
-                description: Returns image/png.
+                description: Returns image/png, encoded in memory without creating an image file on disk.
                 type: string
                 example: <image data>
             application/zip:
               schema:
                 format: binary
-                description: Returns application/zip.
+                description: Returns application/zip, assembled in memory without creating an archive file on disk.
                 type: string
                 example: <zip data>
           description: 'Ok'

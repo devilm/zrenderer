@@ -22,7 +22,7 @@ void createOutputDirectory(string outputDirectory) @safe
 }
 
 string[] run(immutable Config config, LogDg log, LuaState L = null,
-        ResourceManager resManager = null, Resolver resolve = null)
+        ResourceManager resManager = null, Resolver resolve = null, ubyte[]* responseBody = null)
 {
     // Nothing to draw
     if (config.job.length == 0)
@@ -69,11 +69,11 @@ string[] run(immutable Config config, LogDg log, LuaState L = null,
         resolve = new Resolver(L);
     }
 
-    return process(config, log, L, resManager, resolve);
+    return process(config, log, L, resManager, resolve, responseBody);
 }
 
 string[] process(immutable Config config, LogDg log, LuaState L,
-        ResourceManager resManager, Resolver resolve)
+        ResourceManager resManager, Resolver resolve, ubyte[]* responseBody = null)
 {
     import std.file : FileException;
 
@@ -301,13 +301,13 @@ string[] process(immutable Config config, LogDg log, LuaState L,
 
                 auto fnames = storeImages(images, requestFrame, config, outputFilename, zipFilename, log,
                         animationInterval, archive,
-                        textureEffect is null ? 0 : textureEffect.frameRate);
+                        textureEffect is null ? 0 : textureEffect.frameRate, responseBody);
 
                 if (config.outputFormat != OutputFormat.zip)
                 {
                     filenames ~= fnames;
                 }
-                else if (fnames.length > 0)
+                else if (fnames.length > 0 && responseBody is null)
                 {
                     // Delete the just created files because we only want the zip
                     import std.file : rmdirRecurse, FileException;
@@ -333,18 +333,28 @@ string[] process(immutable Config config, LogDg log, LuaState L,
 
         auto filename = buildPath(config.outdir, zipFilename ~ ".zip");
 
-        write(filename, archive.build());
+        if (responseBody is null)
+        {
+            write(filename, archive.build());
+        }
+        else
+        {
+            *responseBody = cast(ubyte[]) archive.build();
+        }
 
         filenames ~= filename;
 
-        try
+        if (responseBody is null)
         {
-            // Delete the just created directory because we only want the zip
-            rmdirRecurse(buildPath(config.outdir, zipFilename));
-        }
-        catch (FileException err)
-        {
-            log(LogLevel.warning, "Couldn't delete directory: " ~ err.msg);
+            try
+            {
+                // Delete the just created directory because we only want the zip
+                rmdirRecurse(buildPath(config.outdir, zipFilename));
+            }
+            catch (FileException err)
+            {
+                log(LogLevel.warning, "Couldn't delete directory: " ~ err.msg);
+            }
         }
     }
 

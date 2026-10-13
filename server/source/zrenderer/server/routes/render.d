@@ -3,23 +3,20 @@ module zrenderer.server.routes.render;
 import config;
 import std.datetime : seconds;
 import std.typecons : Nullable;
-import std.zip : ArchiveMember, ZipArchive;
 import validation : isEffectArgValid, isJobArgValid, isCanvasArgValid,
     isTextureArgValid;
 import vibe.core.concurrency : send, receiveTimeout, OwnerTerminated;
 import vibe.core.core : runWorkerTaskH;
-import vibe.core.log : logInfo, logError;
 import vibe.core.task : Task;
 import vibe.data.json;
 import vibe.data.serialization;
-import vibe.http.common : HTTPStatusException;
 import vibe.http.server : HTTPServerRequest, HTTPServerResponse;
 import vibe.http.status;
 import zrenderer.server.auth : AccessToken, checkAuth;
 import zrenderer.server.dto : RenderRequestData, RenderResponseData, toString;
 import zrenderer.server.globals : defaultConfig, accessTokens;
 import zrenderer.server.routes : setErrorResponse, mergeStruct, logCustomRequest;
-import zrenderer.server.worker : renderWorker;
+import zrenderer.server.worker : RenderWorkerRequest, RenderWorkerResult, renderWorker;
 
 void handleRenderRequest(HTTPServerRequest req, HTTPServerResponse res) @trusted
 {
@@ -49,7 +46,7 @@ void handleRenderRequest(HTTPServerRequest req, HTTPServerResponse res) @trusted
 
     logCustomRequest(req, requestData.toString, accessToken);
 
-    const(Config) mergedConfig = mergeStruct(defaultConfig, requestData);
+    Config mergedConfig = mergeStruct(defaultConfig, requestData);
 
     const maxJobIdsPerRequest = accessToken.isNull
         ? -1
@@ -78,17 +75,28 @@ void handleRenderRequest(HTTPServerRequest req, HTTPServerResponse res) @trusted
         return;
     }
 
+    import std.exception : ifThrown;
+
+    bool downloadImage = (req.query["downloadimage"].length >= 0).ifThrown(false);
+    bool encodeResponse = mergedConfig.outputFormat == OutputFormat.zip || downloadImage;
+    if (encodeResponse)
+    {
+        mergedConfig.returnExistingFiles = false;
+    }
+
     auto worker = runWorkerTaskH(&renderWorker, Task.getThis);
-    send(worker, cast(immutable Config) mergedConfig);
+    send(worker, RenderWorkerRequest(cast(immutable Config) mergedConfig, encodeResponse));
 
     RenderResponseData response;
+    ubyte[] responseBody;
     bool renderingSucceeded = false;
 
     try
     {
         receiveTimeout(5.seconds,
-                (immutable(string)[] filenames) {
-                    response.output = filenames;
+                (RenderWorkerResult result) {
+                    response.output = result.output;
+                    responseBody = cast(ubyte[]) result.body;
                     renderingSucceeded = true;
                 },
                 (bool failed) {
@@ -108,8 +116,6 @@ void handleRenderRequest(HTTPServerRequest req, HTTPServerResponse res) @trusted
         return;
     }
 
-    import std.file : read, FileException;
-
     if (mergedConfig.outputFormat == OutputFormat.zip)
     {
 
@@ -120,23 +126,10 @@ void handleRenderRequest(HTTPServerRequest req, HTTPServerResponse res) @trusted
         }
 
         res.contentType("application/zip");
-        try
-        {
-            res.writeBody(cast(ubyte[]) read(response.output[$-1]));
-        }
-        catch (FileException err)
-        {
-            logError(err.message);
-            setErrorResponse(res, HTTPStatus.internalServerError, "Error when writing response");
-            return;
-        }
+        res.writeBody(cast(ubyte[]) responseBody);
     }
     else
     {
-        import std.exception : ifThrown;
-
-        bool downloadImage = (req.query["downloadimage"].length >= 0).ifThrown(false);
-
         if (downloadImage)
         {
             if (response.output.length == 0)
@@ -146,16 +139,7 @@ void handleRenderRequest(HTTPServerRequest req, HTTPServerResponse res) @trusted
             }
 
             res.contentType("image/png");
-            try
-            {
-                res.writeBody(cast(ubyte[]) read(response.output[0]));
-            }
-            catch (FileException err)
-            {
-                logError(err.message);
-                setErrorResponse(res, HTTPStatus.internalServerError, "Error when writing response");
-                return;
-            }
+            res.writeBody(cast(ubyte[]) responseBody);
         }
         else
         {

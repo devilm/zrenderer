@@ -479,6 +479,61 @@ private int animatedTextureIndex(const ref TextureKeyFrame base,
 
 unittest
 {
+    ubyte[] bitmap = new ubyte[66];
+    void writeUInt(ref ubyte[] target, size_t offset, uint value)
+    {
+        foreach (index; 0 .. uint.sizeof)
+        {
+            target[offset + index] = cast(ubyte) (value >> (index * 8));
+        }
+    }
+
+    bitmap[0] = 'B';
+    bitmap[1] = 'M';
+    writeUInt(bitmap, 2, cast(uint) bitmap.length);
+    writeUInt(bitmap, 10, 62);
+    writeUInt(bitmap, 14, 40);
+    writeUInt(bitmap, 18, 2);
+    writeUInt(bitmap, 22, 1);
+    bitmap[26] = 1;
+    bitmap[28] = 8;
+    writeUInt(bitmap, 34, 4);
+    writeUInt(bitmap, 46, 2);
+    bitmap[58] = 10;
+    bitmap[59] = 20;
+    bitmap[60] = 30;
+    bitmap[62] = 0;
+    bitmap[63] = 1;
+
+    const image = readBitmap(bitmap, "indexed.bmp");
+    assert(image.width == 2 && image.height == 1);
+    assert(image.pixels[0].a == 0);
+    assert(image.pixels[1].r == 255 && image.pixels[1].g == 170 &&
+            image.pixels[1].b == 85 && image.pixels[1].a == 30);
+
+    ubyte[] rgbBitmap = new ubyte[58];
+    rgbBitmap[0] = 'B';
+    rgbBitmap[1] = 'M';
+    writeUInt(rgbBitmap, 2, cast(uint) rgbBitmap.length);
+    writeUInt(rgbBitmap, 10, 54);
+    writeUInt(rgbBitmap, 14, 40);
+    writeUInt(rgbBitmap, 18, 1);
+    writeUInt(rgbBitmap, 22, 1);
+    rgbBitmap[26] = 1;
+    rgbBitmap[28] = 24;
+    writeUInt(rgbBitmap, 34, 4);
+    rgbBitmap[54] = 32;
+    rgbBitmap[55] = 32;
+    rgbBitmap[56] = 32;
+
+    const rgbImage = readBitmap(rgbBitmap, "smoke.bmp");
+    assert(rgbImage.pixels[0].r == 255 && rgbImage.pixels[0].g == 255 &&
+            rgbImage.pixels[0].b == 255 && rgbImage.pixels[0].a == 32);
+
+    const additive = blend(Color(0xFF646464), makeBitmapColor(32, 32, 32), true);
+    assert(additive.r == 132 && additive.g == 132 && additive.b == 132);
+    assert(additive.a == 255);
+
     TextureKeyFrame base;
     base.offsetX = 0f;
     base.offsetY = 0f;
@@ -577,12 +632,30 @@ private RawImage readBitmap(const(ubyte)[] bytes, string filename)
     const signedHeight = peek!(int, Endian.littleEndian)(bytes, 22);
     const bitsPerPixel = peek!(ushort, Endian.littleEndian)(bytes, 28);
     const compression = peek!(uint, Endian.littleEndian)(bytes, 30);
+    const colorsUsed = peek!(uint, Endian.littleEndian)(bytes, 46);
     const height = signedHeight < 0 ? -signedHeight : signedHeight;
 
-    if (headerSize < 40 || width <= 0 || height <= 0 || width > 8192 || height > 8192 ||
-            (bitsPerPixel != 24 && bitsPerPixel != 32) || compression != 0)
+    if (headerSize < 40 || headerSize > bytes.length - 14 || width <= 0 ||
+            height <= 0 || width > 8192 || height > 8192 ||
+            (bitsPerPixel != 8 && bitsPerPixel != 24 && bitsPerPixel != 32) ||
+            compression != 0)
     {
         throw new TextureEffectException("Unsupported BMP texture: " ~ filename);
+    }
+
+    const paletteOffset = 14 + headerSize;
+    const paletteEntries = bitsPerPixel == 8 ? (colorsUsed == 0 ? 256 : colorsUsed) : 0;
+    if (paletteEntries > 256)
+    {
+        throw new TextureEffectException("Invalid BMP color palette: " ~ filename);
+    }
+    if (paletteEntries > 0)
+    {
+        ensureAvailable(bytes, paletteOffset, paletteEntries * 4);
+        if (pixelOffset < paletteOffset + paletteEntries * 4)
+        {
+            throw new TextureEffectException("Invalid BMP color palette: " ~ filename);
+        }
     }
 
     const bytesPerPixel = bitsPerPixel / 8;
@@ -598,12 +671,41 @@ private RawImage readBitmap(const(ubyte)[] bytes, string filename)
         foreach (x; 0 .. width)
         {
             const index = row + x * bytesPerPixel;
-            const blue = bytes[index];
-            const green = bytes[index + 1];
-            const red = bytes[index + 2];
-            const alpha = bitsPerPixel == 32 ? bytes[index + 3] :
-                (red == 0 && green == 0 && blue == 0 ? 0 : 255);
-            image.pixels[cast(size_t) y * width + x] = makeColor(red, green, blue, alpha);
+            ubyte red;
+            ubyte green;
+            ubyte blue;
+            ubyte alpha;
+            if (bitsPerPixel == 8)
+            {
+                const paletteIndex = bytes[index];
+                if (paletteIndex >= paletteEntries)
+                {
+                    throw new TextureEffectException("Invalid BMP palette index: " ~ filename);
+                }
+                const color = paletteOffset + paletteIndex * 4;
+                blue = bytes[color];
+                green = bytes[color + 1];
+                red = bytes[color + 2];
+                image.pixels[cast(size_t) y * width + x] = makeBitmapColor(red, green,
+                        blue);
+            }
+            else
+            {
+                blue = bytes[index];
+                green = bytes[index + 1];
+                red = bytes[index + 2];
+                if (bitsPerPixel == 32)
+                {
+                    alpha = bytes[index + 3];
+                    image.pixels[cast(size_t) y * width + x] = makeColor(red, green,
+                            blue, alpha);
+                }
+                else
+                {
+                    image.pixels[cast(size_t) y * width + x] = makeBitmapColor(red,
+                            green, blue);
+                }
+            }
         }
     }
 
@@ -704,6 +806,19 @@ private Color makeColor(ubyte red, ubyte green, ubyte blue, ubyte alpha) pure no
             (cast(uint) green << 8) | red);
 }
 
+private Color makeBitmapColor(ubyte red, ubyte green, ubyte blue) pure nothrow @safe @nogc
+{
+    const alpha = red > green ? (red > blue ? red : blue) : (green > blue ? green : blue);
+    if (alpha == 0)
+    {
+        return makeColor(0, 0, 0, 0);
+    }
+
+    // Effect BMPs store color intensity on black; move that intensity into alpha.
+    return makeColor(cast(ubyte) (red * 255 / alpha),
+            cast(ubyte) (green * 255 / alpha), cast(ubyte) (blue * 255 / alpha), alpha);
+}
+
 private void drawTriangle(ref RawImage destination, const RawImage texture,
         const float[4] x, const float[4] y, const float[4] u, const float[4] v,
         const int[3] corners, const float[4] tint, int blendSource, int blendDestination)
@@ -769,7 +884,7 @@ private float clamp(float value, float lower, float upper) pure nothrow @safe @n
 
 private Color blend(Color destination, Color source, bool additive = false) pure nothrow @safe @nogc
 {
-    import std.algorithm : min;
+    import std.algorithm : max, min;
 
     if (source.a == 0)
     {
@@ -777,6 +892,23 @@ private Color blend(Color destination, Color source, bool additive = false) pure
     }
     if (additive)
     {
+        if (destination.a == 0)
+        {
+            const maximum = max(source.r, max(source.g, source.b));
+            const alpha = (maximum * source.a + 127) / 255;
+            if (alpha == 0)
+            {
+                return destination;
+            }
+
+            Color result;
+            result.r = cast(ubyte) min(255, (source.r * source.a + alpha / 2) / alpha);
+            result.g = cast(ubyte) min(255, (source.g * source.a + alpha / 2) / alpha);
+            result.b = cast(ubyte) min(255, (source.b * source.a + alpha / 2) / alpha);
+            result.a = cast(ubyte) alpha;
+            return result;
+        }
+
         const alpha = source.a + destination.a * (255 - source.a) / 255;
         if (alpha == 0)
         {
@@ -816,10 +948,14 @@ unittest
     const source = Color(0x80646464);
     const normal = blend(destination, source);
     const additive = blend(destination, source, true);
+    const transparentAdditive = blend(Color.init, makeColor(12, 9, 9, 24), true);
 
     assert(normal.r == 100);
     assert(additive.r == 150);
     assert(additive.a == 255);
+    assert(transparentAdditive.a == 1);
+    assert(transparentAdditive.r == 255 && transparentAdditive.g == 216 &&
+            transparentAdditive.b == 216);
 }
 
 private void appendLE(T)(ref ubyte[] bytes, T value)
