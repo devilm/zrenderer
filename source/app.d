@@ -257,7 +257,8 @@ string[] process(immutable Config config, LogDg log, LuaState L,
             import draw : RawImage;
             import renderer : drawPlayer;
 
-            void sortIndexDelegate(ref int[] index, uint frame, uint garmentFrame)
+            void sortIndexDelegate(ref int[] index, uint frame, uint garmentFrame,
+                    uint actorPoseFrame)
             {
                 int direction = config.action % 8;
 
@@ -266,7 +267,7 @@ string[] process(immutable Config config, LogDg log, LuaState L,
                     if (sprite.type == SpriteType.garment)
                     {
                         sprite.zIndex = zIndexForGarmentSprite(jobid, config.garment, config.action,
-                                garmentFrame, config.gender, direction, L);
+                                actorPoseFrame, config.gender, direction, L);
                     }
                     else if (sprite.type == SpriteType.playerhead && bodyImf !is null)
                     {

@@ -137,9 +137,10 @@ RawImage[] drawAction(scope Sprite sprite, uint action)
     return outputImage;
 }
 
-alias sortDelegate = void delegate(ref int[] index, uint frame, uint garmentFrame);
+alias sortDelegate = void delegate(ref int[] index, uint frame, uint garmentFrame,
+        uint actorPoseFrame);
 
-private uint garmentFrameAt(ulong actorFrame, ulong maxframes, ulong garmentFrames,
+private uint garmentFrameAt(ulong actorFrame, ulong actorFrames, ulong garmentFrames,
         bool cycleStandFrames)
 {
     if (garmentFrames == 0)
@@ -147,25 +148,37 @@ private uint garmentFrameAt(ulong actorFrame, ulong maxframes, ulong garmentFram
         return 0;
     }
 
-    ulong frameIndex = actorFrame;
-    if (cycleStandFrames && maxframes >= 3)
+    if (garmentFrames == 3 && actorFrames >= 3)
     {
-        frameIndex %= maxframes;
+        if (cycleStandFrames)
+        {
+            actorFrame %= actorFrames;
+        }
+
+        return cast(uint) (actorFrame / (actorFrames / 3) % garmentFrames);
     }
 
-    if (frameIndex >= garmentFrames)
+    if (cycleStandFrames && garmentFrames == 3)
     {
-        if (garmentFrames == 3 && maxframes >= 3)
-        {
-            frameIndex = actorFrame / (maxframes / 3) % garmentFrames;
-        }
-        else
-        {
-            frameIndex %= garmentFrames;
-        }
+        return 0;
     }
 
-    return cast(uint) frameIndex;
+    return cast(uint) (actorFrame % garmentFrames);
+}
+
+private ulong actorFrameForCycle(ulong actorFrame, ulong actorFrames, ulong cycleFrames)
+{
+    if (actorFrames == 0)
+    {
+        return actorFrame;
+    }
+
+    if (cycleFrames <= actorFrames)
+    {
+        return actorFrame % actorFrames;
+    }
+
+    return (actorFrame % cycleFrames) * actorFrames / cycleFrames;
 }
 
 private ulong actorFrameAt(ulong outputFrame, float interval, ushort outputFrameRate)
@@ -210,6 +223,10 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
     bool drawSingleFrame = frame < uint.max;
     ulong startframe = drawSingleFrame ? frame : 0;
     ulong maxframes = drawSingleFrame ? frame + 1 : 0;
+    ulong actorFrames = 0;
+    ulong fallbackActorFrames = 0;
+    const playerAction = intToPlayerAction(action);
+    const cycleStandFrames = playerAction == PlayerAction.stand || playerAction == PlayerAction.sit;
 
     foreach (sprite; sprites)
     {
@@ -226,6 +243,14 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
                 import std.algorithm : max;
 
                 maxframes = max(maxframes, drawobject.children.length);
+                if (sprite.type == SpriteType.playerbody)
+                {
+                    actorFrames = max(actorFrames, drawobject.children.length);
+                }
+                else if (sprite.type == SpriteType.playerhead || sprite.type == SpriteType.accessory)
+                {
+                    fallbackActorFrames = max(fallbackActorFrames, drawobject.children.length);
+                }
             }
             else
             {
@@ -241,7 +266,6 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
                 frameindex %= cast(uint) sprite.act.frames(actionindex).length;
             }
 
-            const playerAction = intToPlayerAction(actionindex);
             if (sprite.type == SpriteType.accessory && sprite.act.frames(actionindex).length > 3 &&
                     (playerAction == PlayerAction.stand || playerAction == PlayerAction.sit))
             {
@@ -257,6 +281,11 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
         totalBoundingBox.updateBounds(drawobject.boundingBox);
 
         drawobjects ~= drawobject;
+    }
+
+    if (actorFrames == 0)
+    {
+        actorFrames = fallbackActorFrames;
     }
 
     ulong outputFrames = maxframes;
@@ -304,11 +333,8 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
             canvas != Canvas.init ? -canvas.originx : totalBoundingBox.x1,
             canvas != Canvas.init ? -canvas.originy : totalBoundingBox.y1,
             0);
-
     import std.algorithm.sorting : makeIndex;
-
     int[] sortIndex = new int[sprites.length];
-    const playerAction = intToPlayerAction(action);
 
     for (auto i = startframe; i < outputFrames; ++i)
     {
@@ -319,6 +345,9 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
         const actorFrame = textureEffect is null || drawSingleFrame
             ? i
             : actorFrameAt(i, animationInterval, textureEffect.frameRate);
+        const actorPoseFrame = drawSingleFrame || !cycleStandFrames
+            ? actorFrame
+            : actorFrameForCycle(actorFrame, actorFrames, maxframes);
         uint selectedGarmentFrame = cast(uint) actorFrame;
         foreach (spriteIndex, sprite; sprites)
         {
@@ -326,13 +355,14 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
             {
                 selectedGarmentFrame = drawSingleFrame
                     ? cast(uint) actorFrame
-                    : garmentFrameAt(actorFrame, maxframes,
+                    : garmentFrameAt(actorFrame, actorFrames,
                         drawobjects[spriteIndex].children.length,
                         (playerAction == PlayerAction.stand || playerAction == PlayerAction.sit));
                 break;
             }
         }
-        sortDg(sortIndex, cast(uint) actorFrame, selectedGarmentFrame);
+        sortDg(sortIndex, cast(uint) actorFrame, selectedGarmentFrame,
+                cast(uint) actorPoseFrame);
 
         if (textureEffect !is null)
         {
@@ -394,11 +424,18 @@ RawImage[] drawPlayer(scope Sprite[] sprites, uint action, uint frame,
                 actionindex = 0;
                 frameindex = cast(uint) (actorFrame % sprite.act.frames(0).length);
             }
+            else if (sprite.type == SpriteType.playerbody &&
+                    (playerAction == PlayerAction.stand || playerAction == PlayerAction.sit))
+            {
+                frameindex = drawSingleFrame
+                    ? cast(uint) actorFrame
+                    : actorFrameForCycle(actorFrame, drawobject.children.length, maxframes);
+            }
             else if (sprite.type == SpriteType.garment)
             {
                 frameindex = drawSingleFrame
                     ? cast(uint) actorFrame
-                    : garmentFrameAt(actorFrame, maxframes, drawobject.children.length,
+                    : garmentFrameAt(actorFrame, actorFrames, drawobject.children.length,
                         (playerAction == PlayerAction.stand || playerAction == PlayerAction.sit));
             }
             else if ((sprite.type == SpriteType.playerhead || sprite.type == SpriteType.accessory) &&
@@ -537,11 +574,29 @@ RawImage[] applyBabyScaling(return ref RawImage[] images, float scaleFactor)
 
 unittest
 {
+    assert(garmentFrameAt(0, 1, 6, true) == 0);
+    assert(garmentFrameAt(5, 1, 6, true) == 5);
+    assert(garmentFrameAt(2, 1, 24, true) == 2);
+    assert(garmentFrameAt(2, 3, 24, true) == 2);
+    assert(garmentFrameAt(2, 1, 3, true) == 0);
+    assert(garmentFrameAt(23, 3, 24, true) == 23);
+    assert(garmentFrameAt(24, 3, 24, true) == 0);
     assert(garmentFrameAt(10, 6, 6, true) == 4);
     assert(garmentFrameAt(10, 6, 3, true) == 2);
     assert(garmentFrameAt(10, 6, 2, true) == 0);
     assert(garmentFrameAt(10, 6, 3, false) == 2);
     assert(garmentFrameAt(10, 6, 0, true) == 0);
+    assert(actorFrameForCycle(0, 3, 24) == 0);
+    assert(actorFrameForCycle(7, 3, 24) == 0);
+    assert(actorFrameForCycle(8, 3, 24) == 1);
+    assert(actorFrameForCycle(15, 3, 24) == 1);
+    assert(actorFrameForCycle(16, 3, 24) == 2);
+    assert(actorFrameForCycle(23, 3, 24) == 2);
+    assert(actorFrameForCycle(24, 3, 24) == 0);
+    assert(actorFrameForCycle(2, 3, 3) == 2);
+    assert(actorFrameForCycle(0, 3, 24) == actorFrameForCycle(7, 3, 24));
+    assert(actorFrameForCycle(8, 3, 24) == actorFrameForCycle(15, 3, 24));
+    assert(actorFrameForCycle(16, 3, 24) == actorFrameForCycle(23, 3, 24));
     assert(actorFrameAt(5, 4, 60) == 0);
     assert(actorFrameAt(6, 4, 60) == 1);
     assert(actorFrameAt(18, 12, 60) == 1);
