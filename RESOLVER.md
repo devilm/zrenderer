@@ -45,6 +45,7 @@ Preface: Gender is used in a lot of places and is interpreted as following:
         Player (doram): <code>data/sprite/도람족/몸통/&lt;gender&gt;/&lt;jobname&gt;_&lt;gender&gt;.{spr,act}</code><br>
         Player (outfit): <code>data/sprite/인간족/몸통/&lt;gender&gt;/costume_&lt;outfit&gt;/&lt;jobname&gt;_&lt;gender&gt;_&lt;outfit&gt;.{spr,act}</code><br>
         Player (doram,outfit): <code>data/sprite/도람족/몸통/&lt;gender&gt;/costume_&lt;outfit&gt;/&lt;jobname&gt;_&lt;gender&gt;_&lt;outfit&gt;.{spr,act}</code>
+        <br>For fourth-job IDs 4252-4264, outfit 1 uses the matching third-job resource name.
       </td>
     </tr>
     <tr>
@@ -151,6 +152,7 @@ Body (+outfits) and head sprites can be colored via palettes. These are resolved
         Doram: <code>data/palette/도람족/body/&lt;jobname&gt;_&lt;gender&gt;_&lt;bodyPalette&gt;.pal</code><br>
         Human (outfit): <code>data/palette/몸/costume_&lt;outfit&gt;/&lt;jobname&gt;_&lt;gender&gt;_&lt;bodyPalette&gt;_&lt;outfit&gt;.pal</code><br>
         Doram (outfit): <code>data/palette/도람족/body/costume_&lt;outfit&gt;/&lt;jobname&gt;_&lt;gender&gt;_&lt;bodyPalette&gt;_&lt;outfit&gt;.pal</code>
+        <br>For fourth-job IDs 4252-4264, outfit 1 uses the matching third-job palette name.
       </td>
     </tr>
     <tr>
@@ -163,4 +165,3 @@ Body (+outfits) and head sprites can be colored via palettes. These are resolved
     </tr>
   </tbody>
 </table>
-

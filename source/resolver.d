@@ -55,6 +55,41 @@ bool isWereform(uint jobid) pure nothrow @safe @nogc
     return jobid == 4356 || jobid == 4357;
 }
 
+private uint outfitJobId(uint jobid, uint costumeid) pure nothrow @safe @nogc
+{
+    if (costumeid != 1)
+    {
+        return jobid;
+    }
+
+    switch (jobid)
+    {
+    case 4252: return 4054; // Dragon Knight -> Rune Knight
+    case 4253: return 4058; // Meister -> Mechanic
+    case 4254: return 4059; // Shadow Cross -> Guillotine Cross
+    case 4255: return 4055; // Arch Mage -> Warlock
+    case 4256: return 4057; // Cardinal -> Archbishop
+    case 4257: return 4056; // Windhawk -> Ranger
+    case 4258: return 4067; // Imperial Guard -> Royal Guard
+    case 4259: return 4072; // Biolo -> Genetic
+    case 4260: return 4073; // Abyss Chaser -> Shadow Chaser
+    case 4261: return 4068; // Elemental Master -> Sorcerer
+    case 4262: return 4071; // Inquisitor -> Sura
+    case 4263: return 4069; // Troubadour -> Minstrel
+    case 4264: return 4070; // Trouvere -> Wanderer
+    default: return jobid;
+    }
+}
+
+unittest
+{
+    assert(outfitJobId(4252, 1) == 4054);
+    assert(outfitJobId(4253, 1) == 4058);
+    assert(outfitJobId(4264, 1) == 4070);
+    assert(outfitJobId(4252, 2) == 4252);
+    assert(outfitJobId(4265, 1) == 4265);
+}
+
 
 class Resolver
 {
@@ -189,7 +224,7 @@ class Resolver
 
         if (isPlayer(jobid))
         {
-            auto jobname = this.jobSpriteName(jobid, madogearType);
+            auto jobname = this.jobSpriteName(outfitJobId(jobid, costumeid), madogearType);
             auto costume = costumeid.to!string;
             if (isDoram(jobid))
             {
@@ -324,6 +359,8 @@ class Resolver
         }
 
         bool doram = isDoram(jobid);
+
+        jobid = outfitJobId(jobid, costumeid);
 
         if (jobid > 4000)
         {
@@ -557,4 +594,3 @@ class Resolver
         }
     }
 }
-
